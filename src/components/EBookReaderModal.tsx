@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { BookOpen, Calendar, Eye, Star, PenSquare, Trash2, X, ExternalLink, Book, FileText, Lightbulb } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { Idea } from '../types';
 import { formatDate } from '../utils/dateUtils';
 import { renderHighlightedText } from '../utils/highlightUtils';
@@ -168,9 +167,8 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
 
     // Combined regex for:
     // 1. Highlight: ==text==
-    // 2. Footnote definition or reference: [^id]: explanation OR [^id]
-    // 3. Item marker: 1. , 2) , (1) , [1] , ①
-    const combinedRegex = /(==(.*?)==)|(\[\^([^\]]+)\](?::\s*(.*))?)|((?:^|\s)(?:\d+[\.\)]|\(\d+\)|\[\d+\]|[①-⑩])(?:\s+|$))/g;
+    // 2. Item marker: 1. , 2) , (1) , [1] , ①
+    const combinedRegex = /(==(.*?)==)|((?:^|\s)(?:\d+[\.\)]|\(\d+\)|\[\d+\]|[①-⑩])(?:\s+|$))/g;
 
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
@@ -192,29 +190,8 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
           </mark>
         );
       } else if (match[3]) {
-        // Match 3: Footnote [^id] or [^id]: definition
-        const fnId = match[4];
-        const fnDef = match[5];
-
-        if (fnDef !== undefined) {
-          // Footnote definition line
-          parts.push(
-            <span key={`fndef-${matchIndex}`} className="block my-1 text-xs text-stone-600 bg-stone-100/80 px-2.5 py-1 rounded-md border-l-2 border-amber-500 font-sans">
-              <span className="font-bold text-amber-800 mr-1 font-mono">[{fnId}] 각주:</span>
-              <span>{fnDef}</span>
-            </span>
-          );
-        } else {
-          // Inline Footnote marker
-          parts.push(
-            <sup key={`fn-${matchIndex}`} className="text-amber-800 font-black bg-amber-100/90 border border-amber-300 px-1 py-0.2 rounded-xs text-[10px] mx-0.5 cursor-pointer hover:bg-amber-200 inline-block align-super" title={`각주 ${fnId}`}>
-              [{fnId}]
-            </sup>
-          );
-        }
-      } else if (match[6]) {
-        // Match 6: Number/Symbol marker
-        const rawMarker = match[6];
+        // Match 3: Number/Symbol marker
+        const rawMarker = match[3];
         parts.push(
           <strong key={`marker-${matchIndex}`} className="font-black text-stone-950 inline-block px-0.5">
             {rawMarker}
@@ -330,7 +307,6 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
               >
                 <div className="markdown-body">
                   <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
                     components={{
                       p: ({ children }) => <p className="mb-4 whitespace-pre-line leading-relaxed">{renderTextWithHighlights(children)}</p>,
                       li: ({ children }) => <li className="mb-1.5 whitespace-pre-line leading-relaxed font-normal">{renderTextWithHighlights(children)}</li>,
@@ -339,48 +315,14 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
                       h1: ({ children }) => <h1 className="text-2xl font-black text-stone-900 my-4 border-b border-stone-200 pb-1">{renderTextWithHighlights(children)}</h1>,
                       h2: ({ children }) => <h2 className="text-xl font-extrabold text-stone-900 my-3">{renderTextWithHighlights(children)}</h2>,
                       h3: ({ children }) => <h3 className="text-lg font-bold text-stone-900 my-2">{renderTextWithHighlights(children)}</h3>,
-                      section: ({ node, ...props }) => {
-                        if (props['data-footnotes'] !== undefined || (typeof props.className === 'string' && props.className.includes('footnotes'))) {
-                          return (
-                            <section className="mt-8 pt-4 border-t-2 border-dashed border-amber-300 text-xs text-stone-700 space-y-2 bg-amber-50/50 p-4 rounded-xl border border-amber-200/80">
-                              <div className="font-extrabold text-amber-900 text-xs flex items-center gap-1.5">
-                                📌 각주 (Footnotes)
-                              </div>
-                              {props.children}
-                            </section>
-                          );
-                        }
-                        return <section {...props} />;
-                      },
-                      sup: ({ children }) => (
-                        <sup className="text-amber-900 font-black bg-amber-100 border border-amber-300 px-1 py-0.2 rounded-xs text-[10px] mx-0.5 align-super inline-block">
+                      a: ({ href, children }) => (
+                        <a href={href} target="_blank" rel="noreferrer" className="text-blue-600 font-bold hover:underline">
                           {children}
-                        </sup>
+                        </a>
                       ),
-                      a: ({ href, children }) => {
-                        const isFootnoteRef = href?.includes('#fn') || href?.includes('#user-content-fn');
-                        if (isFootnoteRef) {
-                          return (
-                            <a href={href} className="text-amber-900 font-bold hover:underline">
-                              {children}
-                            </a>
-                          );
-                        }
-                        return (
-                          <a href={href} target="_blank" rel="noreferrer" className="text-blue-600 font-bold hover:underline">
-                            {children}
-                          </a>
-                        );
-                      },
                     }}
                   >
-                    {(() => {
-                      const raw = idea.content || '본문 내용이 비어있습니다.';
-                      let str = raw.replace(/\r\n/g, '\n');
-                      // Ensure footnote definition [^1]: starts on a new block (\n\n) so Markdown parser recognizes it
-                      str = str.replace(/([^\n])\n*(\[\^[^\]]+\]:)/g, '$1\n\n$2');
-                      return str;
-                    })()}
+                    {idea.content || '본문 내용이 비어있습니다.'}
                   </ReactMarkdown>
                 </div>
               </div>

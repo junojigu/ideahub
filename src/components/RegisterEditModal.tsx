@@ -502,7 +502,6 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
                       { label: '중제목 (H2)', code: '## 2단계 중제목', desc: '중간 헤더' },
                       { label: '소제목 (H3)', code: '### 3단계 소제목', desc: '소분류 헤더' },
                       { label: '하이라이트', code: '==형광펜 강조 텍스트==', desc: '노란 형광펜 효과' },
-                      { label: '각주 표시', code: '본문 내용[^1]\n\n[^1]: 각주 설명 내용', desc: '각주 번호 및 하단 설명' },
                       { label: '굵은 글씨', code: '**강조할 텍스트**', desc: '글자 굵게' },
                       { label: '기울임', code: '*기울인 텍스트*', desc: '이탤릭체' },
                       { label: '취소선', code: '~~취소선 텍스트~~', desc: '취소선 표시' },
