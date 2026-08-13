@@ -1,0 +1,6 @@
+{
+  "name": "IdeaHub 지식창고",
+  "description": "구글 스프레드시트 및 Gemini AI와 연동되는 지식과 아이디어 관리 웹앱",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
