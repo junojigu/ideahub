@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { BookOpen, Calendar, Eye, Star, PenSquare, Trash2, X, ExternalLink, Book, FileText, Lightbulb } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { Idea } from '../types';
 import { formatDate } from '../utils/dateUtils';
 import { renderHighlightedText } from '../utils/highlightUtils';
+import { normalizeMarkdown } from '../utils/markdownUtils';
 import { ConfirmModal } from './ConfirmModal';
 
 interface EBookReaderModalProps {
@@ -307,14 +310,44 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
               >
                 <div className="markdown-body">
                   <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkBreaks]}
                     components={{
-                      p: ({ children }) => <p className="mb-4 whitespace-pre-line leading-relaxed">{renderTextWithHighlights(children)}</p>,
-                      li: ({ children }) => <li className="mb-1.5 whitespace-pre-line leading-relaxed font-normal">{renderTextWithHighlights(children)}</li>,
-                      ol: ({ children }) => <ol className="list-decimal list-inside space-y-1.5 my-3 font-bold text-stone-950">{children}</ol>,
+                      p: ({ children }) => <p className="mb-4 leading-relaxed font-normal">{renderTextWithHighlights(children)}</p>,
+                      li: ({ children }) => <li className="mb-1.5 leading-relaxed font-normal">{renderTextWithHighlights(children)}</li>,
+                      ol: ({ children }) => <ol className="list-decimal list-inside space-y-1.5 my-3 font-semibold text-stone-900">{children}</ol>,
                       ul: ({ children }) => <ul className="list-disc list-inside space-y-1.5 my-3">{children}</ul>,
-                      h1: ({ children }) => <h1 className="text-2xl font-black text-stone-900 my-4 border-b border-stone-200 pb-1">{renderTextWithHighlights(children)}</h1>,
-                      h2: ({ children }) => <h2 className="text-xl font-extrabold text-stone-900 my-3">{renderTextWithHighlights(children)}</h2>,
-                      h3: ({ children }) => <h3 className="text-lg font-bold text-stone-900 my-2">{renderTextWithHighlights(children)}</h3>,
+                      h1: ({ children }) => <h1 className="text-2xl font-black text-stone-900 mt-6 mb-3 border-b border-stone-200 pb-1.5">{renderTextWithHighlights(children)}</h1>,
+                      h2: ({ children }) => <h2 className="text-xl font-extrabold text-stone-900 mt-5 mb-2.5">{renderTextWithHighlights(children)}</h2>,
+                      h3: ({ children }) => <h3 className="text-lg font-bold text-stone-900 mt-4 mb-2">{renderTextWithHighlights(children)}</h3>,
+                      h4: ({ children }) => <h4 className="text-base font-bold text-stone-900 mt-3 mb-1.5">{renderTextWithHighlights(children)}</h4>,
+                      blockquote: ({ children }) => (
+                        <blockquote className="my-4 border-l-4 border-amber-500 pl-4 py-1.5 bg-amber-50/50 text-stone-700 italic rounded-r-lg">
+                          {renderTextWithHighlights(children)}
+                        </blockquote>
+                      ),
+                      code: ({ className, children, ...props }) => {
+                        const isInline = !className && typeof children === 'string' && !children.includes('\n');
+                        if (isInline) {
+                          return (
+                            <code className="bg-stone-100 text-stone-800 px-1.5 py-0.5 rounded text-xs font-mono border border-stone-200 font-semibold" {...props}>
+                              {children}
+                            </code>
+                          );
+                        }
+                        return (
+                          <pre className="my-3 p-3 bg-stone-900 text-stone-100 rounded-xl overflow-x-auto text-xs font-mono leading-normal border border-stone-800">
+                            <code {...props}>{children}</code>
+                          </pre>
+                        );
+                      },
+                      hr: () => <hr className="my-6 border-stone-200" />,
+                      table: ({ children }) => (
+                        <div className="overflow-x-auto my-4 border border-stone-200 rounded-xl">
+                          <table className="min-w-full divide-y divide-stone-200 text-xs">{children}</table>
+                        </div>
+                      ),
+                      th: ({ children }) => <th className="bg-stone-100 px-3 py-2 text-left font-bold text-stone-900">{children}</th>,
+                      td: ({ children }) => <td className="px-3 py-2 border-t border-stone-100 text-stone-700">{children}</td>,
                       a: ({ href, children }) => (
                         <a href={href} target="_blank" rel="noreferrer" className="text-blue-600 font-bold hover:underline">
                           {children}
@@ -322,7 +355,7 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
                       ),
                     }}
                   >
-                    {idea.content || '본문 내용이 비어있습니다.'}
+                    {normalizeMarkdown(idea.content || '본문 내용이 비어있습니다.')}
                   </ReactMarkdown>
                 </div>
               </div>

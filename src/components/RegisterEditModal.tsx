@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Sparkles, Star, Link as LinkIcon, FileText, X, Plus, Check, Loader2, Move, HelpCircle, Copy, Code } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Sparkles, Star, Link as LinkIcon, FileText, X, Plus, Check, Loader2, Move, HelpCircle, Copy, Code, Bold, Italic, Strikethrough, Highlighter, List, ListOrdered, Quote, Heading1, Heading2, Heading3 } from 'lucide-react';
 import { Idea } from '../types';
 
 interface RegisterEditModalProps {
@@ -28,6 +28,10 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [isMdGuideOpen, setIsMdGuideOpen] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  // Content Textarea Ref & Selection Memory for Cursor-based Insertion
+  const contentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [savedSelection, setSavedSelection] = useState<{ start: number; end: number } | null>(null);
 
   // Dragging window position states
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -151,6 +155,78 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
       parts.push(tag);
       setTagsStr(parts.join(', ') + ', ');
     }
+  };
+
+  // Record cursor selection whenever user interacts with textarea
+  const updateCursorSelection = () => {
+    if (contentTextareaRef.current) {
+      setSavedSelection({
+        start: contentTextareaRef.current.selectionStart,
+        end: contentTextareaRef.current.selectionEnd,
+      });
+    }
+  };
+
+  /**
+   * Inserts markdown snippet directly at current cursor/selection position.
+   * If text is selected, wraps or replaces placeholder with selected text.
+   * If isBlock is true, ensures clean line breaks before and after.
+   */
+  const insertMarkdownAtCursor = (
+    snippet: string,
+    isBlock: boolean = false,
+    placeholder: string = ''
+  ) => {
+    const textarea = contentTextareaRef.current;
+    let start = savedSelection?.start ?? (textarea ? textarea.selectionStart : content.length);
+    let end = savedSelection?.end ?? (textarea ? textarea.selectionEnd : content.length);
+
+    if (start < 0 || start > content.length) start = content.length;
+    if (end < 0 || end > content.length) end = content.length;
+    if (start > end) {
+      const tmp = start;
+      start = end;
+      end = tmp;
+    }
+
+    const selectedText = content.substring(start, end);
+    let inserted = snippet;
+
+    // If there is selected text, intelligently wrap or replace placeholder
+    if (selectedText) {
+      if (placeholder && inserted.includes(placeholder)) {
+        inserted = inserted.replace(placeholder, selectedText);
+      }
+    }
+
+    let prefix = '';
+    let suffix = '';
+
+    if (isBlock) {
+      // Ensure leading newline if not at start of line
+      if (start > 0 && content[start - 1] !== '\n') {
+        prefix = '\n\n';
+      }
+      // Ensure trailing newline if following text isn't a newline
+      if (end < content.length && content[end] !== '\n') {
+        suffix = '\n\n';
+      }
+    }
+
+    const fullInsertion = prefix + inserted + suffix;
+    const newContent = content.substring(0, start) + fullInsertion + content.substring(end);
+    setContent(newContent);
+
+    const newCursorPos = start + prefix.length + inserted.length;
+    setSavedSelection({ start: newCursorPos, end: newCursorPos });
+
+    // Refocus and place cursor
+    setTimeout(() => {
+      if (textarea) {
+        textarea.focus();
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    }, 50);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -416,7 +492,10 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
               </label>
               <button
                 type="button"
-                onClick={() => setIsMdGuideOpen(true)}
+                onClick={() => {
+                  updateCursorSelection();
+                  setIsMdGuideOpen(true);
+                }}
                 className="text-xs font-extrabold text-blue-600 hover:text-blue-800 flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-blue-50 transition-colors cursor-pointer"
                 title="마크다운 작성 가이드 확인"
               >
@@ -425,9 +504,125 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
               </button>
             </div>
 
+            {/* Quick Markdown Formatting Toolbar */}
+            <div className="flex items-center gap-1 overflow-x-auto py-1 px-1.5 bg-white border border-slate-200 rounded-lg text-xs select-none shadow-2xs">
+              <span className="text-[10px] font-bold text-slate-400 pl-0.5 pr-1 shrink-0">빠른 서식:</span>
+              
+              <button
+                type="button"
+                onClick={() => insertMarkdownAtCursor('# 1단계 대제목', true, '1단계 대제목')}
+                className="px-1.5 py-0.5 font-black text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
+                title="대제목 (H1)"
+              >
+                H1
+              </button>
+              <button
+                type="button"
+                onClick={() => insertMarkdownAtCursor('## 2단계 중제목', true, '2단계 중제목')}
+                className="px-1.5 py-0.5 font-extrabold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
+                title="중제목 (H2)"
+              >
+                H2
+              </button>
+              <button
+                type="button"
+                onClick={() => insertMarkdownAtCursor('### 3단계 소제목', true, '3단계 소제목')}
+                className="px-1.5 py-0.5 font-bold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
+                title="소제목 (H3)"
+              >
+                H3
+              </button>
+
+              <div className="w-px h-3.5 bg-slate-200 mx-0.5 shrink-0" />
+
+              <button
+                type="button"
+                onClick={() => insertMarkdownAtCursor('**강조할 텍스트**', false, '강조할 텍스트')}
+                className="px-1.5 py-0.5 font-black text-slate-800 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
+                title="굵게 (Bold)"
+              >
+                B
+              </button>
+              <button
+                type="button"
+                onClick={() => insertMarkdownAtCursor('*기울인 텍스트*', false, '기울인 텍스트')}
+                className="px-1.5 py-0.5 italic font-serif font-bold text-slate-800 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
+                title="기울임 (Italic)"
+              >
+                I
+              </button>
+              <button
+                type="button"
+                onClick={() => insertMarkdownAtCursor('~~취소선 텍스트~~', false, '취소선 텍스트')}
+                className="px-1.5 py-0.5 line-through font-semibold text-slate-600 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
+                title="취소선"
+              >
+                S
+              </button>
+              <button
+                type="button"
+                onClick={() => insertMarkdownAtCursor('==형광펜 강조 텍스트==', false, '형광펜 강조 텍스트')}
+                className="px-1.5 py-0.5 bg-amber-100/80 hover:bg-amber-200 text-amber-900 font-bold rounded transition-colors shrink-0 text-[11px] border border-amber-300/60"
+                title="형광펜 강조"
+              >
+                🖍️ 형광펜
+              </button>
+
+              <div className="w-px h-3.5 bg-slate-200 mx-0.5 shrink-0" />
+
+              <button
+                type="button"
+                onClick={() => insertMarkdownAtCursor('- 목록 항목\n- 다음 항목', true, '목록 항목')}
+                className="px-1.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
+                title="불릿 점 목록 (- )"
+              >
+                • 목록
+              </button>
+              <button
+                type="button"
+                onClick={() => insertMarkdownAtCursor('1. 첫 번째 순서\n2. 두 번째 순서', true, '첫 번째 순서')}
+                className="px-1.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
+                title="순서 있는 목록 (1. )"
+              >
+                1. 순서
+              </button>
+              <button
+                type="button"
+                onClick={() => insertMarkdownAtCursor('> 중요한 인용구', true, '중요한 인용구')}
+                className="px-1.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
+                title="인용구 (> )"
+              >
+                ❝ 인용
+              </button>
+              <button
+                type="button"
+                onClick={() => insertMarkdownAtCursor('```\n코드 입력\n```', true, '코드 입력')}
+                className="px-1.5 py-0.5 font-mono text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
+                title="코드 블록"
+              >
+                `코드`
+              </button>
+              <button
+                type="button"
+                onClick={() => insertMarkdownAtCursor('[링크 이름](https://)', false, '링크 이름')}
+                className="px-1.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
+                title="하이퍼링크"
+              >
+                🔗 링크
+              </button>
+            </div>
+
             <textarea
+              ref={contentTextareaRef}
               value={content}
-              onChange={(e) => setContent(e.target.value)}
+              onChange={(e) => {
+                setContent(e.target.value);
+                updateCursorSelection();
+              }}
+              onSelect={updateCursorSelection}
+              onKeyUp={updateCursorSelection}
+              onClick={updateCursorSelection}
+              onBlur={updateCursorSelection}
               placeholder="지식 노트 상세 내용 및 아이디어를 기술하세요..."
               className="w-full px-3 py-2.5 min-h-[220px] sm:min-h-[280px] text-sm sm:text-base border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 bg-white leading-relaxed resize-y text-slate-800 font-sans"
             />
@@ -483,8 +678,7 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
             {/* Modal Content / Syntax Table */}
             <div className="p-4 sm:p-5 overflow-y-auto space-y-3.5 text-xs text-slate-700 leading-relaxed">
               <p className="bg-blue-50 text-blue-900 p-2.5 rounded-xl border border-blue-100 text-xs font-medium">
-                💡 전자책 읽기 모드에서 아래 문법이 자동으로 변환되어 예쁘게 표시됩니다.
-                원하는 예시의 <span className="font-bold text-blue-700">[본문 삽입]</span> 버튼을 누르면 작성 창에 바로 입력됩니다.
+                💡 원하는 예시의 <span className="font-bold text-blue-700">[커서 위치 삽입]</span> 버튼을 누르면 본문에서 현재 커서가 놓인 위치에 서식이 바로 삽입됩니다.
               </p>
 
               <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs bg-white">
@@ -493,23 +687,23 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
                     <tr className="bg-slate-100/90 text-slate-800 border-b border-slate-200 text-[11px] font-extrabold uppercase">
                       <th className="py-2 px-3 border-r border-slate-200 w-28 sm:w-32">구분 (기능)</th>
                       <th className="py-2 px-3 border-r border-slate-200">마크다운 문법 예시</th>
-                      <th className="py-2 px-2.5 text-center w-20">작용</th>
+                      <th className="py-2 px-2.5 text-center w-24">작용</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-sans text-xs">
                     {[
-                      { label: '대제목 (H1)', code: '# 1단계 대제목', desc: '가장 큰 헤더' },
-                      { label: '중제목 (H2)', code: '## 2단계 중제목', desc: '중간 헤더' },
-                      { label: '소제목 (H3)', code: '### 3단계 소제목', desc: '소분류 헤더' },
-                      { label: '하이라이트', code: '==형광펜 강조 텍스트==', desc: '노란 형광펜 효과' },
-                      { label: '굵은 글씨', code: '**강조할 텍스트**', desc: '글자 굵게' },
-                      { label: '기울임', code: '*기울인 텍스트*', desc: '이탤릭체' },
-                      { label: '취소선', code: '~~취소선 텍스트~~', desc: '취소선 표시' },
-                      { label: '순서없는 목록', code: '- 첫 번째 항목\n- 두 번째 항목', desc: '불릿 점 목록' },
-                      { label: '순서있는 목록', code: '1. 첫 번째 순서\n2. 두 번째 순서', desc: '숫자 목록 (번호 자동 강조)' },
-                      { label: '인용구', code: '> 중요한 참고 문헌 및 인용구', desc: '왼쪽 세로선 강조' },
-                      { label: '코드 상자', code: '```\nconsole.log("Hello World");\n```', desc: '코드 블록 상자' },
-                      { label: '하이퍼링크', code: '[구글 바로가기](https://google.com)', desc: '외부 웹사이트 링크' },
+                      { label: '대제목 (H1)', code: '# 1단계 대제목', isBlock: true, placeholder: '1단계 대제목', desc: '가장 큰 헤더' },
+                      { label: '중제목 (H2)', code: '## 2단계 중제목', isBlock: true, placeholder: '2단계 중제목', desc: '중간 헤더' },
+                      { label: '소제목 (H3)', code: '### 3단계 소제목', isBlock: true, placeholder: '3단계 소제목', desc: '소분류 헤더' },
+                      { label: '하이라이트', code: '==형광펜 강조 텍스트==', isBlock: false, placeholder: '형광펜 강조 텍스트', desc: '노란 형광펜 효과' },
+                      { label: '굵은 글씨', code: '**강조할 텍스트**', isBlock: false, placeholder: '강조할 텍스트', desc: '글자 굵게' },
+                      { label: '기울임', code: '*기울인 텍스트*', isBlock: false, placeholder: '기울인 텍스트', desc: '이탤릭체' },
+                      { label: '취소선', code: '~~취소선 텍스트~~', isBlock: false, placeholder: '취소선 텍스트', desc: '취소선 표시' },
+                      { label: '순서없는 목록', code: '- 첫 번째 항목\n- 두 번째 항목', isBlock: true, placeholder: '', desc: '불릿 점 목록' },
+                      { label: '순서있는 목록', code: '1. 첫 번째 순서\n2. 두 번째 순서', isBlock: true, placeholder: '', desc: '숫자 목록 (번호 자동 강조)' },
+                      { label: '인용구', code: '> 중요한 참고 문헌 및 인용구', isBlock: true, placeholder: '중요한 참고 문헌 및 인용구', desc: '왼쪽 세로선 강조' },
+                      { label: '코드 상자', code: '```\nconsole.log("Hello World");\n```', isBlock: true, placeholder: 'console.log("Hello World");', desc: '코드 블록 상자' },
+                      { label: '하이퍼링크', code: '[구글 바로가기](https://google.com)', isBlock: false, placeholder: '구글 바로가기', desc: '외부 웹사이트 링크' },
                     ].map((item, idx) => (
                       <tr key={idx} className="hover:bg-blue-50/40 transition-colors">
                         <td className="py-2 px-3 border-r border-slate-200/80 font-bold text-slate-900 shrink-0">
@@ -525,7 +719,7 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
                           <button
                             type="button"
                             onClick={() => {
-                              setContent((prev) => (prev ? `${prev}\n\n${item.code}` : item.code));
+                              insertMarkdownAtCursor(item.code, item.isBlock, item.placeholder);
                               setCopiedIndex(idx);
                               setTimeout(() => setCopiedIndex(null), 1200);
                             }}
@@ -534,7 +728,7 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
                             {copiedIndex === idx ? (
                               <>
                                 <Check className="w-3 h-3 text-emerald-600" />
-                                <span className="text-emerald-700">완료</span>
+                                <span className="text-emerald-700">삽입됨</span>
                               </>
                             ) : (
                               <>
