@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Star, Link as LinkIcon, FileText, X, Plus, Check, Loader2, Move, HelpCircle, Copy, Code, Bold, Italic, Strikethrough, Highlighter, List, ListOrdered, Quote, Heading1, Heading2, Heading3 } from 'lucide-react';
+import { Sparkles, Star, Link as LinkIcon, FileText, X, Plus, Check, Loader2, Move, HelpCircle, Copy, Code, Bold, Italic, Strikethrough, Highlighter, List, ListOrdered, Quote, Heading1, Heading2, Heading3, Eye, Edit3 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { Idea } from '../types';
+import { normalizeMarkdown } from '../utils/markdownUtils';
 
 interface RegisterEditModalProps {
   isOpen: boolean;
@@ -28,6 +32,7 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [isMdGuideOpen, setIsMdGuideOpen] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [contentTab, setContentTab] = useState<'edit' | 'preview'>('edit');
 
   // Content Textarea Ref & Selection Memory for Cursor-based Insertion
   const contentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -486,10 +491,41 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
           {/* Content Area */}
           <div className="flex flex-col gap-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-slate-800 flex items-center gap-1">
-                <FileText className="w-3.5 h-3.5 text-blue-600" />
-                <span>상세 내용</span>
-              </label>
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                  <FileText className="w-3.5 h-3.5 text-blue-600" />
+                  <span>상세 내용</span>
+                </label>
+
+                {/* Edit / Preview Toggle */}
+                <div className="flex items-center bg-slate-200/80 p-0.5 rounded-lg text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setContentTab('edit')}
+                    className={`flex items-center gap-1 px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                      contentTab === 'edit'
+                        ? 'bg-white text-blue-600 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Edit3 className="w-3 h-3" />
+                    <span>작성</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setContentTab('preview')}
+                    className={`flex items-center gap-1 px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                      contentTab === 'preview'
+                        ? 'bg-white text-blue-600 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Eye className="w-3 h-3" />
+                    <span>미리보기</span>
+                  </button>
+                </div>
+              </div>
+
               <button
                 type="button"
                 onClick={() => {
@@ -505,127 +541,175 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
             </div>
 
             {/* Quick Markdown Formatting Toolbar */}
-            <div className="flex items-center gap-1 overflow-x-auto py-1 px-1.5 bg-white border border-slate-200 rounded-lg text-xs select-none shadow-2xs">
-              <span className="text-[10px] font-bold text-slate-400 pl-0.5 pr-1 shrink-0">빠른 서식:</span>
-              
-              <button
-                type="button"
-                onClick={() => insertMarkdownAtCursor('# 1단계 대제목', true, '1단계 대제목')}
-                className="px-1.5 py-0.5 font-black text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
-                title="대제목 (H1)"
-              >
-                H1
-              </button>
-              <button
-                type="button"
-                onClick={() => insertMarkdownAtCursor('## 2단계 중제목', true, '2단계 중제목')}
-                className="px-1.5 py-0.5 font-extrabold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
-                title="중제목 (H2)"
-              >
-                H2
-              </button>
-              <button
-                type="button"
-                onClick={() => insertMarkdownAtCursor('### 3단계 소제목', true, '3단계 소제목')}
-                className="px-1.5 py-0.5 font-bold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
-                title="소제목 (H3)"
-              >
-                H3
-              </button>
+            {contentTab === 'edit' && (
+              <div className="flex items-center gap-1 overflow-x-auto py-1 px-1.5 bg-white border border-slate-200 rounded-lg text-xs select-none shadow-2xs">
+                <span className="text-[10px] font-bold text-slate-400 pl-0.5 pr-1 shrink-0">빠른 서식:</span>
+                
+                <button
+                  type="button"
+                  onClick={() => insertMarkdownAtCursor('# 1단계 대제목', true, '1단계 대제목')}
+                  className="px-1.5 py-0.5 font-black text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
+                  title="대제목 (H1)"
+                >
+                  H1
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdownAtCursor('## 2단계 중제목', true, '2단계 중제목')}
+                  className="px-1.5 py-0.5 font-extrabold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
+                  title="중제목 (H2)"
+                >
+                  H2
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdownAtCursor('### 3단계 소제목', true, '3단계 소제목')}
+                  className="px-1.5 py-0.5 font-bold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
+                  title="소제목 (H3)"
+                >
+                  H3
+                </button>
 
-              <div className="w-px h-3.5 bg-slate-200 mx-0.5 shrink-0" />
+                <div className="w-px h-3.5 bg-slate-200 mx-0.5 shrink-0" />
 
-              <button
-                type="button"
-                onClick={() => insertMarkdownAtCursor('**강조할 텍스트**', false, '강조할 텍스트')}
-                className="px-1.5 py-0.5 font-black text-slate-800 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
-                title="굵게 (Bold)"
-              >
-                B
-              </button>
-              <button
-                type="button"
-                onClick={() => insertMarkdownAtCursor('*기울인 텍스트*', false, '기울인 텍스트')}
-                className="px-1.5 py-0.5 italic font-serif font-bold text-slate-800 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
-                title="기울임 (Italic)"
-              >
-                I
-              </button>
-              <button
-                type="button"
-                onClick={() => insertMarkdownAtCursor('~~취소선 텍스트~~', false, '취소선 텍스트')}
-                className="px-1.5 py-0.5 line-through font-semibold text-slate-600 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
-                title="취소선"
-              >
-                S
-              </button>
-              <button
-                type="button"
-                onClick={() => insertMarkdownAtCursor('==형광펜 강조 텍스트==', false, '형광펜 강조 텍스트')}
-                className="px-1.5 py-0.5 bg-amber-100/80 hover:bg-amber-200 text-amber-900 font-bold rounded transition-colors shrink-0 text-[11px] border border-amber-300/60"
-                title="형광펜 강조"
-              >
-                🖍️ 형광펜
-              </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdownAtCursor('**강조할 텍스트**', false, '강조할 텍스트')}
+                  className="px-1.5 py-0.5 font-black text-slate-800 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
+                  title="굵게 (Bold)"
+                >
+                  B
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdownAtCursor('*기울인 텍스트*', false, '기울인 텍스트')}
+                  className="px-1.5 py-0.5 italic font-serif font-bold text-slate-800 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
+                  title="기울임 (Italic)"
+                >
+                  I
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdownAtCursor('~~취소선 텍스트~~', false, '취소선 텍스트')}
+                  className="px-1.5 py-0.5 line-through font-semibold text-slate-600 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
+                  title="취소선"
+                >
+                  S
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdownAtCursor('==형광펜 강조 텍스트==', false, '형광펜 강조 텍스트')}
+                  className="px-1.5 py-0.5 bg-amber-100/80 hover:bg-amber-200 text-amber-900 font-bold rounded transition-colors shrink-0 text-[11px] border border-amber-300/60"
+                  title="형광펜 강조"
+                >
+                  🖍️ 형광펜
+                </button>
 
-              <div className="w-px h-3.5 bg-slate-200 mx-0.5 shrink-0" />
+                <div className="w-px h-3.5 bg-slate-200 mx-0.5 shrink-0" />
 
-              <button
-                type="button"
-                onClick={() => insertMarkdownAtCursor('- 목록 항목\n- 다음 항목', true, '목록 항목')}
-                className="px-1.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
-                title="불릿 점 목록 (- )"
-              >
-                • 목록
-              </button>
-              <button
-                type="button"
-                onClick={() => insertMarkdownAtCursor('1. 첫 번째 순서\n2. 두 번째 순서', true, '첫 번째 순서')}
-                className="px-1.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
-                title="순서 있는 목록 (1. )"
-              >
-                1. 순서
-              </button>
-              <button
-                type="button"
-                onClick={() => insertMarkdownAtCursor('> 중요한 인용구', true, '중요한 인용구')}
-                className="px-1.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
-                title="인용구 (> )"
-              >
-                ❝ 인용
-              </button>
-              <button
-                type="button"
-                onClick={() => insertMarkdownAtCursor('```\n코드 입력\n```', true, '코드 입력')}
-                className="px-1.5 py-0.5 font-mono text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
-                title="코드 블록"
-              >
-                `코드`
-              </button>
-              <button
-                type="button"
-                onClick={() => insertMarkdownAtCursor('[링크 이름](https://)', false, '링크 이름')}
-                className="px-1.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
-                title="하이퍼링크"
-              >
-                🔗 링크
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdownAtCursor('- 목록 항목\n- 다음 항목', true, '목록 항목')}
+                  className="px-1.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
+                  title="불릿 점 목록 (- )"
+                >
+                  • 목록
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdownAtCursor('1. 첫 번째 순서\n2. 두 번째 순서', true, '첫 번째 순서')}
+                  className="px-1.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
+                  title="순서 있는 목록 (1. )"
+                >
+                  1. 순서
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdownAtCursor('> 중요한 인용구', true, '중요한 인용구')}
+                  className="px-1.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
+                  title="인용구 (> )"
+                >
+                  ❝ 인용
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdownAtCursor('```\n코드 입력\n```', true, '코드 입력')}
+                  className="px-1.5 py-0.5 font-mono text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
+                  title="코드 블록"
+                >
+                  `코드`
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdownAtCursor('[링크 이름](https://)', false, '링크 이름')}
+                  className="px-1.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
+                  title="하이퍼링크"
+                >
+                  🔗 링크
+                </button>
+              </div>
+            )}
 
-            <textarea
-              ref={contentTextareaRef}
-              value={content}
-              onChange={(e) => {
-                setContent(e.target.value);
-                updateCursorSelection();
-              }}
-              onSelect={updateCursorSelection}
-              onKeyUp={updateCursorSelection}
-              onClick={updateCursorSelection}
-              onBlur={updateCursorSelection}
-              placeholder="지식 노트 상세 내용 및 아이디어를 기술하세요..."
-              className="w-full px-3 py-2.5 min-h-[220px] sm:min-h-[280px] text-sm sm:text-base border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 bg-white leading-relaxed resize-y text-slate-800 font-sans"
-            />
+            {contentTab === 'edit' ? (
+              <textarea
+                ref={contentTextareaRef}
+                value={content}
+                onChange={(e) => {
+                  setContent(e.target.value);
+                  updateCursorSelection();
+                }}
+                onSelect={updateCursorSelection}
+                onKeyUp={updateCursorSelection}
+                onClick={updateCursorSelection}
+                onBlur={updateCursorSelection}
+                placeholder="지식 노트 상세 내용 및 아이디어를 기술하세요..."
+                className="w-full px-3 py-2.5 min-h-[220px] sm:min-h-[280px] text-sm sm:text-base border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 bg-white leading-relaxed resize-y text-slate-800 font-sans"
+              />
+            ) : (
+              <div className="w-full px-4 py-3 min-h-[220px] sm:min-h-[280px] border border-slate-300 rounded-lg bg-white overflow-y-auto max-h-[360px] text-slate-800 font-sans text-sm sm:text-base">
+                {content.trim() ? (
+                  <div className="markdown-body">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm, remarkBreaks]}
+                      components={{
+                        p: ({ children }) => <p className="mb-3 leading-relaxed">{children}</p>,
+                        li: ({ children }) => <li className="mb-1 leading-relaxed">{children}</li>,
+                        ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 my-2 font-semibold text-slate-900">{children}</ol>,
+                        ul: ({ children }) => <ul className="list-disc list-inside space-y-1 my-2">{children}</ul>,
+                        h1: ({ children }) => <h1 className="text-xl font-black text-slate-900 mt-4 mb-2 border-b border-slate-200 pb-1">{children}</h1>,
+                        h2: ({ children }) => <h2 className="text-lg font-extrabold text-slate-900 mt-3 mb-2">{children}</h2>,
+                        h3: ({ children }) => <h3 className="text-base font-bold text-slate-900 mt-2.5 mb-1.5">{children}</h3>,
+                        h4: ({ children }) => <h4 className="text-sm font-bold text-slate-900 mt-2 mb-1">{children}</h4>,
+                        blockquote: ({ children }) => (
+                          <blockquote className="my-2 border-l-4 border-amber-500 pl-3 py-1 bg-amber-50/50 text-slate-700 italic rounded-r">
+                            {children}
+                          </blockquote>
+                        ),
+                        code: ({ className, children, ...props }) => {
+                          const isInline = !className && typeof children === 'string' && !children.includes('\n');
+                          if (isInline) {
+                            return (
+                              <code className="bg-slate-100 text-slate-800 px-1 py-0.5 rounded text-xs font-mono border border-slate-200" {...props}>
+                                {children}
+                              </code>
+                            );
+                          }
+                          return (
+                            <pre className="my-2 p-2.5 bg-slate-900 text-slate-100 rounded-lg overflow-x-auto text-xs font-mono">
+                              <code {...props}>{children}</code>
+                            </pre>
+                          );
+                        },
+                      }}
+                    >
+                      {normalizeMarkdown(content)}
+                    </ReactMarkdown>
+                  </div>
+                ) : (
+                  <p className="text-slate-400 italic text-sm py-4 text-center">작성된 내용이 없습니다. '작성' 탭에서 내용을 입력해 보세요.</p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}
