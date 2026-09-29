@@ -13,7 +13,27 @@ export async function requestGasApi(payload: GasProxyPayload): Promise<any> {
   const { gasUrl, action, ...rest } = payload;
   const targetUrl = gasUrl || 'https://script.google.com/macros/s/AKfycbwxMyj2Ztb5qtIYGHgU2MipDl6hQOv-6xP18EPHdNkPfE0ndN6d6gaCcvTgNgApGqUw/exec';
 
-  // 1. Try local proxy (/api/gas/proxy) first
+  // For read operations ('getIdeasAndAnalysis'):
+  // Direct browser GET is significantly faster (no Vercel serverless cold-start overhead)
+  if (action === 'getIdeasAndAnalysis') {
+    try {
+      const directUrl = `${targetUrl}${targetUrl.includes('?') ? '&' : '?'}action=getIdeasAndAnalysis&t=${Date.now()}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+      const directRes = await fetch(directUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (directRes.ok) {
+        const data = await directRes.json();
+        return { status: 'SUCCESS', ...data };
+      }
+    } catch {
+      // Fallback to proxy if direct connection was aborted or blocked
+    }
+  }
+
+  // 1. Try local proxy (/api/gas/proxy)
   try {
     const proxyRes = await fetch('/api/gas/proxy', {
       method: 'POST',

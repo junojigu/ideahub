@@ -1,6 +1,8 @@
 import React from 'react';
 import { Search, Mic, Plus, Sparkles, Eye, BookOpen, Layers, ArrowRight, Clock } from 'lucide-react';
 import { Idea } from '../types';
+import { formatDate } from '../utils/dateUtils';
+import { SOURCE_CATEGORIES } from '../utils/sourceUtils';
 
 interface HomeViewProps {
   ideas: Idea[];
@@ -108,6 +110,27 @@ export const HomeView: React.FC<HomeViewProps> = ({
         </button>
       </div>
 
+      {/* Quick Source Category Search Chips */}
+      <div className="flex items-center justify-center gap-2 mb-6 flex-wrap">
+        <span className="text-xs font-semibold text-slate-400 mr-1">출처별 모아보기:</span>
+        {SOURCE_CATEGORIES.map((cat) => (
+          <button
+            key={cat.key}
+            type="button"
+            onClick={() => {
+              onSearchChange(cat.tag);
+              onSwitchTab('preview');
+            }}
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-white/90 hover:bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-300 shadow-2xs transition-all cursor-pointer active:scale-95"
+            title={`출처가 '${cat.label}'인 지식 모아보기`}
+          >
+            <span>{cat.emoji}</span>
+            <span>{cat.label}</span>
+            <span className="text-[10px] text-slate-400 font-mono">({cat.tag})</span>
+          </button>
+        ))}
+      </div>
+
       {/* Action Buttons */}
       <div className="flex flex-wrap items-center justify-center gap-3 mb-10">
         <button
@@ -159,8 +182,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           ) : (
             <ul className="w-full divide-y divide-slate-100">
               {displayRecent.map((idea) => {
-                const dateParts = (idea.date || '').split('T')[0].split('-');
-                const shortDate = dateParts.length >= 3 ? `${dateParts[1]}/${dateParts[2]}` : idea.date;
+                const formattedDate = formatDate(idea.date, idea.id);
 
                 return (
                   <li key={idea.id}>
@@ -171,9 +193,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     >
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0 group-hover:scale-125 transition-transform"></span>
-                        {shortDate && (
-                          <span className="text-xs font-semibold text-slate-400 font-mono shrink-0">
-                            {shortDate}
+                        {formattedDate && (
+                          <span className="text-xs font-bold text-slate-500 font-mono shrink-0">
+                            {formattedDate}
                           </span>
                         )}
                         <span className="text-xs sm:text-sm font-semibold text-slate-800 group-hover:text-blue-600 transition-colors truncate">

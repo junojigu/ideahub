@@ -7,7 +7,15 @@ import {
 import { Idea } from '../types';
 import { formatDate, parseTimestamp } from '../utils/dateUtils';
 import { renderHighlightedText } from '../utils/highlightUtils';
-import { cleanSourceTitle, extractMainBookTitle, getSourceType } from '../utils/sourceUtils';
+import { 
+  cleanSourceTitle, 
+  extractMainBookTitle, 
+  getSourceType, 
+  SourceCategory, 
+  SOURCE_CATEGORIES, 
+  getSourceCategory, 
+  parseSourceCategorySearch 
+} from '../utils/sourceUtils';
 import { ConfirmModal } from './ConfirmModal';
 
 interface FeedViewProps {
@@ -57,6 +65,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'single'; id: string; title?: string } | { type: 'batch'; ids: string[] } | null>(null);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
+  const [selectedSourceCategory, setSelectedSourceCategory] = useState<SourceCategory>('all');
   
   // Tag dropdown & search states
   const [isTagDropdownOpen, setIsTagDropdownOpen] = useState(false);
@@ -95,25 +104,61 @@ export const FeedView: React.FC<FeedViewProps> = ({
     return Array.from(map.values()).sort((a, b) => b.count - a.count);
   }, [ideas]);
 
-  // Parse search terms
-  const searchTerms = searchQuery
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean);
+  // Compute Source Category counts (웹링크, 도서, 문서, 메모)
+  const sourceCategoryCounts = useMemo(() => {
+    const counts: Record<SourceCategory, number> = {
+      all: ideas.length,
+      book: 0,
+      link: 0,
+      document: 0,
+      memo: 0,
+    };
+    ideas.forEach((idea) => {
+      const cat = getSourceCategory(idea.sourceUrl);
+      if (counts[cat] !== undefined) {
+        counts[cat]++;
+      }
+    });
+    return counts;
+  }, [ideas]);
+
+  // Parse smart source tags from search query (e.g. "[도서]", "[웹링크]", "[문서]", "[메모]")
+  const { sourceCategory: queryCategory, cleanQuery } = useMemo(
+    () => parseSourceCategorySearch(searchQuery),
+    [searchQuery]
+  );
+
+  const activeSourceCategory: SourceCategory =
+    queryCategory !== 'all' ? queryCategory : selectedSourceCategory;
+
+  // Parse search terms from clean query
+  const searchTerms = useMemo(() => {
+    return cleanQuery
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
+  }, [cleanQuery]);
 
   // Filter ideas
   const filteredIdeas = ideas.filter((idea) => {
-    // Source filter (Book Shelf)
+    // 1. Source Category filter (웹링크, 도서, 문서, 메모)
+    if (activeSourceCategory !== 'all') {
+      const ideaCategory = getSourceCategory(idea.sourceUrl);
+      if (ideaCategory !== activeSourceCategory) return false;
+    }
+
+    // 2. Specific Book Shelf filter
     if (selectedSource) {
       const targetKey = selectedSource.trim().toLowerCase();
       const cleanIdea = cleanSourceTitle(idea.sourceUrl).toLowerCase();
       const mainIdea = extractMainBookTitle(idea.sourceUrl).toLowerCase();
-      const matchesSource = cleanIdea.includes(targetKey) || mainIdea.includes(targetKey) || targetKey.includes(mainIdea);
+      const matchesSource =
+        cleanIdea.includes(targetKey) || mainIdea.includes(targetKey) || targetKey.includes(mainIdea);
       if (!matchesSource) return false;
     }
 
-    // Tag filter
+    // 3. Tag filter
     if (selectedTags.length > 0) {
       if (!selectedTags.every((t) => idea.tags?.includes(t))) return false;
     }
@@ -121,14 +166,19 @@ export const FeedView: React.FC<FeedViewProps> = ({
       if (!selectedSubTags.every((t) => idea.tags?.includes(t))) return false;
     }
 
-    // Search query filter
+    // 4. Search query filter (matches title, content, tags, AND sourceUrl!)
     if (searchTerms.length > 0) {
       const title = (idea.title || '').toLowerCase();
       const content = (idea.content || '').toLowerCase();
       const tagsStr = (idea.tags || []).join(' ').toLowerCase();
+      const source = (idea.sourceUrl || '').toLowerCase();
 
       const matchesAll = searchTerms.every(
-        (term) => title.includes(term) || content.includes(term) || tagsStr.includes(term)
+        (term) =>
+          title.includes(term) ||
+          content.includes(term) ||
+          tagsStr.includes(term) ||
+          source.includes(term)
       );
       if (!matchesAll) return false;
     }
@@ -261,6 +311,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
     onSelectTags([]);
     onSelectSubTags([]);
     setSelectedSource(null);
+    setSelectedSourceCategory('all');
     setCurrentPage(1);
   };
 
@@ -285,7 +336,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
           title="원문 링크"
         >
           <ExternalLink className="w-3 h-3" />
-          <span className="max-w-[120px] truncate">{clean}</span>
+          <span className="max-w-[120px] truncate">{cleanQuery ? renderHighlightedText(clean, cleanQuery) : clean}</span>
         </a>
       );
     }
@@ -306,7 +357,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
           title={`클릭하여 '${mainTitle}' 메모만 모아보기`}
         >
           <Book className="w-3 h-3 text-amber-600" />
-          <span className="max-w-[120px] truncate">{clean}</span>
+          <span className="max-w-[120px] truncate">{cleanQuery ? renderHighlightedText(clean, cleanQuery) : clean}</span>
         </button>
       );
     }
@@ -327,7 +378,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
           title="클릭하여 이 문서 메모만 모아보기"
         >
           <FileText className="w-3 h-3 text-emerald-600" />
-          <span className="max-w-[120px] truncate">{clean}</span>
+          <span className="max-w-[120px] truncate">{cleanQuery ? renderHighlightedText(clean, cleanQuery) : clean}</span>
         </button>
       );
     }
@@ -347,7 +398,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
         title="클릭하여 이 출처 메모만 모아보기"
       >
         <Lightbulb className="w-3 h-3 text-indigo-600" />
-        <span className="max-w-[120px] truncate">{clean}</span>
+        <span className="max-w-[120px] truncate">{cleanQuery ? renderHighlightedText(clean, cleanQuery) : clean}</span>
       </button>
     );
   };
@@ -408,7 +459,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
               </div>
             )}
 
-            {(searchQuery || selectedTags.length > 0 || selectedSubTags.length > 0 || selectedSource) && (
+            {(searchQuery || selectedTags.length > 0 || selectedSubTags.length > 0 || selectedSource || activeSourceCategory !== 'all') && (
               <button
                 onClick={resetAllFilters}
                 className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
@@ -446,6 +497,74 @@ export const FeedView: React.FC<FeedViewProps> = ({
                 {sortDir === 'desc' ? '↓' : '↑'}
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Source Category Extraction Bar (전체, 웹링크, 도서, 문서, 메모) */}
+        <div className="bg-slate-50/90 border border-slate-200/90 p-2 sm:p-2.5 rounded-2xl flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs font-black text-slate-700 mr-1 flex items-center gap-1 shrink-0">
+              <Filter className="w-3.5 h-3.5 text-blue-600" />
+              <span>출처 추출:</span>
+            </span>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedSourceCategory('all');
+                if (queryCategory !== 'all') onSearchChange(cleanQuery);
+                setCurrentPage(1);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                activeSourceCategory === 'all'
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                  : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+              }`}
+            >
+              <span>전체</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
+                activeSourceCategory === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 font-bold'
+              }`}>
+                {sourceCategoryCounts.all}
+              </span>
+            </button>
+
+            {SOURCE_CATEGORIES.map((cat) => {
+              const isSelected = activeSourceCategory === cat.key;
+              return (
+                <button
+                  key={cat.key}
+                  type="button"
+                  onClick={() => {
+                    if (isSelected) {
+                      setSelectedSourceCategory('all');
+                      if (queryCategory !== 'all') onSearchChange(cleanQuery);
+                    } else {
+                      setSelectedSourceCategory(cat.key);
+                    }
+                    setCurrentPage(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                    isSelected ? cat.activeClass : cat.inactiveClass
+                  }`}
+                  title={`출처가 '${cat.label}'인 지식만 추출 (${cat.tag})`}
+                >
+                  <span>{cat.emoji}</span>
+                  <span>{cat.label}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+                    isSelected ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {sourceCategoryCounts[cat.key]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="text-[11px] text-slate-400 font-medium hidden md:flex items-center gap-1">
+            <span>검색창에</span>
+            <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-600 font-mono text-[10px]">[도서]</code>
+            <span>입력 시 바로 추출</span>
           </div>
         </div>
 

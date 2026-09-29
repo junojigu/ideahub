@@ -63,9 +63,15 @@ export default function App() {
     };
   });
 
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>({
-    connected: false,
-    isSyncing: false,
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => {
+    const cached = localStorage.getItem(STORAGE_KEY_IDEAS);
+    const hasCached = cached && cached !== '[]' && cached.length > 5;
+    return {
+      connected: Boolean(hasCached),
+      isSyncing: false,
+      lastSyncedAt: localStorage.getItem('ideahub_last_synced_at') || undefined,
+      message: hasCached ? '로컬 캐시 보관소 활성' : undefined,
+    };
   });
 
   const [currentTab, setCurrentTab] = useState<'home' | 'preview' | 'graph' | 'chat'>('home');
@@ -156,17 +162,21 @@ export default function App() {
           });
           return [...localOnlyRecent, ...data.ideas];
         });
+        const syncTimeStr = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+        localStorage.setItem('ideahub_last_synced_at', syncTimeStr);
         setSyncStatus({
           connected: true,
           isSyncing: false,
-          lastSyncedAt: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+          lastSyncedAt: syncTimeStr,
           message: '구글 스프레드시트와 성공적으로 동기화되었습니다.',
         });
       } else if (data && Array.isArray(data.ideas) && data.ideas.length === 0) {
+        const syncTimeStr = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+        localStorage.setItem('ideahub_last_synced_at', syncTimeStr);
         setSyncStatus({
           connected: true,
           isSyncing: false,
-          lastSyncedAt: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+          lastSyncedAt: syncTimeStr,
           message: '시트에 연결되었으나 보관된 데이터가 0개입니다.',
         });
       } else {
@@ -174,13 +184,14 @@ export default function App() {
       }
     } catch (error: any) {
       console.warn('GAS Sync warning:', error?.message);
-      setSyncStatus({
-        connected: false,
+      setSyncStatus((prev) => ({
+        ...prev,
         isSyncing: false,
-        message: `시트 동기화 실패 (${error?.message || '연결 오류'})`,
-      });
+        connected: ideas.length > 0 ? true : false,
+        message: ideas.length > 0 ? '로컬 캐시 보관소 사용 중 (오프라인)' : `시트 동기화 실패 (${error?.message || '연결 오류'})`,
+      }));
     }
-  }, [gasConfig.gasUrl]);
+  }, [gasConfig.gasUrl, ideas.length]);
 
   // Initial sync attempt & auto-sync when returning to the tab
   useEffect(() => {

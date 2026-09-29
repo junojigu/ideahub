@@ -68,25 +68,30 @@ export const Header: React.FC<HeaderProps> = ({
                 onSyncGas();
               }
             }}
-            disabled={syncStatus.isSyncing}
             className={`text-xs font-semibold px-2.5 py-1 rounded-full border transition-all flex items-center gap-1.5 cursor-pointer ${
-              syncStatus.isSyncing
-                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                : syncStatus.connected
-                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+              syncStatus.connected
+                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                : syncStatus.isSyncing
+                  ? 'bg-amber-50 text-amber-700 border-amber-200'
                   : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
             }`}
             title={syncStatus.message || "클릭하여 Google Apps Script 설정 및 동기화"}
           >
-            {syncStatus.isSyncing ? (
+            {syncStatus.connected ? (
+              syncStatus.isSyncing ? (
+                <RefreshCw className="w-3 h-3 animate-spin text-emerald-600" />
+              ) : (
+                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+              )
+            ) : syncStatus.isSyncing ? (
               <RefreshCw className="w-3 h-3 animate-spin text-amber-600" />
-            ) : syncStatus.connected ? (
-              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
             ) : (
               <AlertCircle className="w-3 h-3 text-rose-500" />
             )}
             <span className="hidden sm:inline">
-              {syncStatus.isSyncing ? '동기화 중...' : syncStatus.connected ? '시트 연결됨' : '로컬 모드 (설정 필요)'}
+              {syncStatus.connected
+                ? (syncStatus.isSyncing ? '시트 동기화 중...' : '시트 연결됨')
+                : (syncStatus.isSyncing ? '동기화 연결 중...' : '로컬 모드 (설정 필요)')}
             </span>
           </button>
 
