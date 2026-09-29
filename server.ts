@@ -98,7 +98,7 @@ Idea Content: "${content || "내용 없음"}"
 Return JSON matching the schema.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-3.8-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -155,7 +155,7 @@ Generate a compelling synthesis in Korean with:
 Return valid JSON according to schema.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-3.8-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -185,6 +185,58 @@ Return valid JSON according to schema.`;
   }
 });
 
+// 4.5. Gemini AI: Smart Merge & Synthesis of Multiple Notes
+app.post("/api/gemini/merge-notes", async (req, res) => {
+  try {
+    const { notes, bookTitle } = req.body;
+    if (!notes || !Array.isArray(notes) || notes.length === 0) {
+      return res.status(400).json({ error: "At least one note is required to merge" });
+    }
+
+    const ai = getGeminiClient();
+    const notesContent = notes
+      .map((n: any, idx: number) => `### [메모 ${idx + 1}] ${n.title}\n- 작성일: ${n.date || "미상"}\n- 본문:\n${n.content}`)
+      .join("\n\n---\n\n");
+
+    const prompt = `당신은 지식 아카이빙 및 도서 독서록 종합 전문가입니다.
+사용자가 ${bookTitle ? `[${bookTitle}] 도서/출처에서` : ""} 작성한 여러 편의 분절된 발췌 및 메모들을 검토하여, 논리적 흐름이 매끄럽고 중복이 정돈된 **하나의 완성된 종합 독서 리포트/지식 노트(Markdown)**로 통합해 주세요.
+
+[요구사항]
+1. 원본의 핵심 통찰, 원문 발췌 내용, 저자 인용구를 왜곡하거나 임의로 삭제하지 말고 충실히 살릴 것.
+2. 흩어진 조각들을 기승전결 또는 주제별 소제목(##, ###)과 순서 목록(1. 2. 3.)으로 체계적으로 묶어 읽기 편하게 구성할 것.
+3. 한국어로 작성하며, 강조할 부분은 **볼드**나 마크다운 형식을 적절히 사용할 것.
+4. 결과물로 제공할 종합 제목(mergedTitle)과 마크다운 본문(mergedContent), 그리고 1문장 핵심 요약(summary)을 생성할 것.
+
+[통합할 원본 메모들 (${notes.length}개)]:
+${notesContent}
+
+Return JSON according to the schema.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.8-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            mergedTitle: { type: Type.STRING, description: "통합 노트 제목 (예: [통합본] 도서명 종합 발췌 및 독서록)" },
+            mergedContent: { type: Type.STRING, description: "정리된 완성형 마크다운 본문" },
+            summary: { type: Type.STRING, description: "통합본 1문장 핵심 요약" }
+          },
+          required: ["mergedTitle", "mergedContent", "summary"]
+        }
+      }
+    });
+
+    const result = JSON.parse(response.text || "{}");
+    return res.json(result);
+  } catch (error: any) {
+    console.error("Gemini Merge Notes Error:", error);
+    return res.status(500).json({ error: error?.message || "Failed to merge notes" });
+  }
+});
+
 // 5. Gemini AI: Q&A Chat over Knowledge Base
 app.post("/api/gemini/chat", async (req, res) => {
   try {
@@ -211,7 +263,7 @@ Provide a helpful, well-structured response in Markdown. Also identify which not
 Return JSON according to schema.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-3.8-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",

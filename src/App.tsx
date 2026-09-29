@@ -9,6 +9,7 @@ import { RegisterEditModal } from './components/RegisterEditModal';
 import { CreativeSynthesisModal } from './components/CreativeSynthesisModal';
 import { SettingsModal } from './components/SettingsModal';
 import { OwnerAuthModal } from './components/OwnerAuthModal';
+import { MergeNotesModal } from './components/MergeNotesModal';
 import { DEFAULT_IDEAS } from './data/defaultIdeas';
 import { Idea, GasConfig, SyncStatus } from './types';
 
@@ -74,6 +75,11 @@ export default function App() {
   const [isOwnerAuthenticated, setIsOwnerAuthenticated] = useState(false);
   const [remoteOwnerPin, setRemoteOwnerPin] = useState<string>('');
   const [todayRecIdea, setTodayRecIdea] = useState<Idea | null>(null);
+
+  // Merge and Continuous Reading states
+  const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
+  const [selectedIdeasToMerge, setSelectedIdeasToMerge] = useState<Idea[]>([]);
+  const [isContinuousReadingActive, setIsContinuousReadingActive] = useState(false);
 
   // Sync state to local storage
   useEffect(() => {
@@ -365,6 +371,86 @@ export default function App() {
     }
   };
 
+  // Open Merge Modal Handler
+  const handleOpenMergeModal = (ideasToMerge: Idea[]) => {
+    if (!ideasToMerge || ideasToMerge.length === 0) return;
+    setSelectedIdeasToMerge(ideasToMerge);
+    setIsMergeModalOpen(true);
+  };
+
+  // Open Continuous Reading for a book / source
+  const handleOpenContinuousReading = (sourceUrl: string, sampleIdeaId?: string) => {
+    let targetId = sampleIdeaId;
+    if (!targetId) {
+      const cleanTarget = sourceUrl.replace(/^[📚📄💡🔗]\s*(\[.*?\])?\s*/, '').trim().toLowerCase();
+      const match = ideas.find((i) => (i.sourceUrl || '').replace(/^[📚📄💡🔗]\s*(\[.*?\])?\s*/, '').trim().toLowerCase() === cleanTarget);
+      targetId = match?.id;
+    }
+
+    if (targetId) {
+      setIsContinuousReadingActive(true);
+      handleOpenPreviewModal(targetId);
+    }
+  };
+
+  // Save Merged Idea & optionally delete originals
+  const handleSaveMergedIdea = (mergedData: Partial<Idea>, originalIdsToDelete?: string[]) => {
+    const newId = `ID_${Date.now()}`;
+    const newDate = new Date().toISOString().split('T')[0];
+
+    const newMergedIdea: Idea = {
+      id: newId,
+      date: newDate,
+      title: mergedData.title || '통합 지식 노트',
+      content: mergedData.content || '',
+      tags: mergedData.tags || ['통합'],
+      sourceUrl: mergedData.sourceUrl || '',
+      importance: mergedData.importance || 3,
+      views: 1,
+    };
+
+    setIdeas((prev) => {
+      let nextList = [newMergedIdea, ...prev];
+      if (originalIdsToDelete && originalIdsToDelete.length > 0) {
+        nextList = nextList.filter((i) => !originalIdsToDelete.includes(String(i.id)));
+      }
+      return nextList;
+    });
+
+    if (originalIdsToDelete && originalIdsToDelete.length > 0) {
+      setRecentViewedIds((prev) => prev.filter((i) => !originalIdsToDelete.includes(i)));
+      originalIdsToDelete.forEach((id) => {
+        fetch('/api/gas/proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'deleteIdea',
+            id,
+            gasUrl: gasConfig.gasUrl,
+          }),
+        }).catch((err) => console.warn('GAS Delete Error:', err));
+      });
+    }
+
+    fetch('/api/gas/proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'saveIdea',
+        title: newMergedIdea.title,
+        content: newMergedIdea.content,
+        tags: newMergedIdea.tags.join(','),
+        sourceUrl: newMergedIdea.sourceUrl,
+        importance: newMergedIdea.importance,
+        gasUrl: gasConfig.gasUrl,
+      }),
+    }).catch((err) => console.warn('GAS Save Error:', err));
+
+    setIsMergeModalOpen(false);
+    setCurrentTab('preview');
+    handleOpenPreviewModal(newId);
+  };
+
   const previewIdea = previewIdeaId ? ideas.find((i) => String(i.id) === String(previewIdeaId)) || null : null;
 
   return (
@@ -430,6 +516,8 @@ export default function App() {
               setEditingIdea(null);
               setIsRegisterModalOpen(true);
             }}
+            onOpenMergeModal={handleOpenMergeModal}
+            onOpenContinuousReading={handleOpenContinuousReading}
           />
         )}
 
@@ -455,7 +543,13 @@ export default function App() {
         idea={previewIdea}
         isOpen={Boolean(previewIdeaId)}
         searchQuery={searchQuery}
-        onClose={() => setPreviewIdeaId(null)}
+        allIdeas={ideas}
+        initialContinuousMode={isContinuousReadingActive}
+        onOpenMergeModal={handleOpenMergeModal}
+        onClose={() => {
+          setPreviewIdeaId(null);
+          setIsContinuousReadingActive(false);
+        }}
         onStartEdit={(id) => {
           const target = ideas.find((i) => String(i.id) === String(id));
           if (target) {
@@ -468,6 +562,13 @@ export default function App() {
           setSelectedTags([tag]);
           setCurrentTab('preview');
         }}
+      />
+
+      <MergeNotesModal
+        isOpen={isMergeModalOpen}
+        onClose={() => setIsMergeModalOpen(false)}
+        selectedIdeas={selectedIdeasToMerge}
+        onSaveMergedIdea={handleSaveMergedIdea}
       />
 
       <RegisterEditModal

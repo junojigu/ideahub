@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Sparkles, RotateCw, Filter, ChevronDown, Trash2, ArrowUpDown, 
   Star, Eye, PenSquare, ArrowRight, ExternalLink, Book, FileText, Lightbulb,
-  Download, Network, CheckSquare, Square, Plus
+  Download, Network, CheckSquare, Square, Plus, Layers, X
 } from 'lucide-react';
 import { Idea } from '../types';
 import { formatDate, parseTimestamp } from '../utils/dateUtils';
@@ -26,6 +26,8 @@ interface FeedViewProps {
   pageSize: number;
   onExportData: (format: 'json' | 'csv') => void;
   onOpenRegisterModal?: () => void;
+  onOpenMergeModal?: (ideas: Idea[]) => void;
+  onOpenContinuousReading?: (sourceUrl: string, sampleIdeaId?: string) => void;
 }
 
 export const FeedView: React.FC<FeedViewProps> = ({
@@ -45,18 +47,52 @@ export const FeedView: React.FC<FeedViewProps> = ({
   pageSize,
   onExportData,
   onOpenRegisterModal,
+  onOpenMergeModal,
+  onOpenContinuousReading,
 }) => {
   const [sortField, setSortField] = useState<'date' | 'views' | 'importance' | 'title'>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'single'; id: string; title?: string } | { type: 'batch'; ids: string[] } | null>(null);
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
   
   // Tag dropdown & search states
   const [isTagDropdownOpen, setIsTagDropdownOpen] = useState(false);
   const [tagSearchQuery, setTagSearchQuery] = useState('');
   const [tagSortOrder, setTagSortOrder] = useState<'count' | 'alphabetical'>('count');
   const [hoveredTag, setHoveredTag] = useState<string | null>(null);
+
+  // Compute Book Shelf / Source statistics
+  const sourceStats = useMemo(() => {
+    const map = new Map<string, { rawSource: string; count: number; displayName: string; type: 'book' | 'general' | 'link' | 'other' }>();
+    ideas.forEach((idea) => {
+      const src = (idea.sourceUrl || '').trim();
+      if (!src) return;
+      const clean = src.replace(/^[📚📄💡🔗]\s*(\[.*?\])?\s*/, '').trim();
+      if (!clean) return;
+
+      const key = clean.toLowerCase();
+      const existing = map.get(key);
+      const isBook = src.startsWith('📚') || src.includes('[도서]');
+      const isGeneral = src.startsWith('📄') || src.includes('[일반]');
+      const isLink = src.startsWith('http') || src.startsWith('🔗');
+      const type = isBook ? 'book' : isGeneral ? 'general' : isLink ? 'link' : 'other';
+
+      if (existing) {
+        existing.count += 1;
+      } else {
+        map.set(key, {
+          rawSource: src,
+          count: 1,
+          displayName: clean,
+          type,
+        });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [ideas]);
 
   // Parse search terms
   const searchTerms = searchQuery
@@ -67,6 +103,13 @@ export const FeedView: React.FC<FeedViewProps> = ({
 
   // Filter ideas
   const filteredIdeas = ideas.filter((idea) => {
+    // Source filter (Book Shelf)
+    if (selectedSource) {
+      const cleanTarget = selectedSource.replace(/^[📚📄💡🔗]\s*(\[.*?\])?\s*/, '').trim().toLowerCase();
+      const cleanIdea = (idea.sourceUrl || '').replace(/^[📚📄💡🔗]\s*(\[.*?\])?\s*/, '').trim().toLowerCase();
+      if (cleanIdea !== cleanTarget) return false;
+    }
+
     // Tag filter
     if (selectedTags.length > 0) {
       if (!selectedTags.every((t) => idea.tags?.includes(t))) return false;
@@ -209,6 +252,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
     onSearchChange('');
     onSelectTags([]);
     onSelectSubTags([]);
+    setSelectedSource(null);
     setCurrentPage(1);
   };
 
@@ -216,6 +260,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
   const renderSourceBadge = (sourceStr?: string) => {
     if (!sourceStr) return null;
     const clean = sourceStr.trim();
+    const sourceDisplayName = clean.replace(/^[📚📄💡🔗]\s*(\[.*?\])?\s*/, '').trim();
 
     if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('www.') || clean.startsWith('🔗')) {
       const href = clean.replace(/^🔗\s*/, '').startsWith('www.') ? `https://${clean}` : clean.replace(/^🔗\s*/, '');
@@ -236,27 +281,63 @@ export const FeedView: React.FC<FeedViewProps> = ({
 
     if (clean.startsWith('📚') || clean.includes('[도서]')) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-lg bg-amber-50 text-amber-900 border border-amber-200 shrink-0">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedSource((prev) => (prev === sourceDisplayName ? null : sourceDisplayName));
+          }}
+          className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-lg border transition-all cursor-pointer shrink-0 ${
+            selectedSource === sourceDisplayName
+              ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
+              : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200'
+          }`}
+          title="클릭하여 이 책의 메모만 모아보기"
+        >
           <Book className="w-3 h-3 text-amber-600" />
-          <span className="max-w-[120px] truncate">{clean.replace(/^📚\s*\[도서\]\s*/, '')}</span>
-        </span>
+          <span className="max-w-[120px] truncate">{sourceDisplayName}</span>
+        </button>
       );
     }
 
     if (clean.startsWith('📄') || clean.includes('[일반]')) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-lg bg-emerald-50 text-emerald-900 border border-emerald-200 shrink-0">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedSource((prev) => (prev === sourceDisplayName ? null : sourceDisplayName));
+          }}
+          className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-lg border transition-all cursor-pointer shrink-0 ${
+            selectedSource === sourceDisplayName
+              ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-200'
+          }`}
+          title="클릭하여 이 문서의 메모만 모아보기"
+        >
           <FileText className="w-3 h-3 text-emerald-600" />
-          <span className="max-w-[120px] truncate">{clean.replace(/^📄\s*\[일반\]\s*/, '')}</span>
-        </span>
+          <span className="max-w-[120px] truncate">{sourceDisplayName}</span>
+        </button>
       );
     }
 
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-900 border border-indigo-200 shrink-0">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setSelectedSource((prev) => (prev === sourceDisplayName ? null : sourceDisplayName));
+        }}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-lg border transition-all cursor-pointer shrink-0 ${
+          selectedSource === sourceDisplayName
+            ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+            : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-indigo-200'
+        }`}
+        title="클릭하여 이 출처 메모만 모아보기"
+      >
         <Lightbulb className="w-3 h-3 text-indigo-600" />
-        <span className="max-w-[120px] truncate">{clean.replace(/^💡\s*\[기타\]\s*/, '')}</span>
-      </span>
+        <span className="max-w-[120px] truncate">{sourceDisplayName}</span>
+      </button>
     );
   };
 
@@ -292,16 +373,31 @@ export const FeedView: React.FC<FeedViewProps> = ({
 
           <div className="flex items-center gap-2 flex-wrap">
             {checkedIds.length > 0 && (
-              <button
-                onClick={() => setDeleteTarget({ type: 'batch', ids: checkedIds })}
-                className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>선택 삭제 ({checkedIds.length})</span>
-              </button>
+              <div className="flex items-center gap-2">
+                {onOpenMergeModal && (
+                  <button
+                    onClick={() => {
+                      const selected = ideas.filter((i) => checkedIds.includes(i.id));
+                      onOpenMergeModal(selected);
+                    }}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl shadow-2xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    <span>선택 노트 하나로 통합 ({checkedIds.length})</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setDeleteTarget({ type: 'batch', ids: checkedIds })}
+                  className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>선택 삭제 ({checkedIds.length})</span>
+                </button>
+              </div>
             )}
 
-            {(searchQuery || selectedTags.length > 0 || selectedSubTags.length > 0) && (
+            {(searchQuery || selectedTags.length > 0 || selectedSubTags.length > 0 || selectedSource) && (
               <button
                 onClick={resetAllFilters}
                 className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
@@ -357,6 +453,60 @@ export const FeedView: React.FC<FeedViewProps> = ({
               <span>현재 페이지 전체 선택</span>
             </button>
             <span>{validCurrentPage} / {totalPages} 페이지</span>
+          </div>
+        )}
+
+        {/* Book Shelf Active Banner */}
+        {selectedSource && (
+          <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center font-bold text-base shadow-2xs shrink-0">
+                📚
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-black text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded-full">
+                    도서·출처 서재 모아보기
+                  </span>
+                  <span className="text-xs text-amber-800 font-bold">
+                    총 {filteredIdeas.length}편의 메모
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-black text-amber-950 mt-0.5">
+                  {selectedSource}
+                </h3>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {onOpenContinuousReading && filteredIdeas.length > 0 && (
+                <button
+                  onClick={() => onOpenContinuousReading(selectedSource, filteredIdeas[0]?.id)}
+                  className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black rounded-xl shadow-2xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                >
+                  <Book className="w-3.5 h-3.5" />
+                  <span>📖 전편 연속 읽기 ({filteredIdeas.length}편)</span>
+                </button>
+              )}
+
+              {onOpenMergeModal && filteredIdeas.length > 1 && (
+                <button
+                  onClick={() => onOpenMergeModal(filteredIdeas)}
+                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl shadow-2xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>📑 이 출처 메모 하나로 통합</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => setSelectedSource(null)}
+                className="px-3 py-1.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>서재 필터 해제</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -554,6 +704,57 @@ export const FeedView: React.FC<FeedViewProps> = ({
                 </button>
               </div>
             )}
+          </div>
+
+          <div className="h-px bg-slate-200"></div>
+
+          {/* Book Shelf (도서 및 출처별 서재) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-extrabold text-slate-900 text-sm font-sans flex items-center gap-1.5">
+                <Book className="w-4 h-4 text-amber-600" />
+                <span>도서 및 출처 서재 ({sourceStats.length}개)</span>
+              </h3>
+              {selectedSource && (
+                <button
+                  onClick={() => setSelectedSource(null)}
+                  className="text-[11px] text-blue-600 font-bold hover:underline cursor-pointer"
+                >
+                  전체 보기
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+              {sourceStats.length === 0 ? (
+                <p className="text-xs text-slate-400 py-1">등록된 출처가 없습니다.</p>
+              ) : (
+                sourceStats.map((src) => {
+                  const isSelected = selectedSource?.toLowerCase() === src.displayName.toLowerCase();
+                  return (
+                    <button
+                      key={src.displayName}
+                      onClick={() => setSelectedSource(isSelected ? null : src.displayName)}
+                      className={`w-full px-3 py-2 rounded-xl text-xs text-left transition-all cursor-pointer flex items-center justify-between gap-2 border ${
+                        isSelected
+                          ? 'bg-amber-100 text-amber-950 font-black border-amber-300 shadow-2xs'
+                          : 'bg-white hover:bg-amber-50/70 text-slate-700 font-semibold border-slate-200 hover:border-amber-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <span className="shrink-0">{src.type === 'book' ? '📚' : src.type === 'general' ? '📄' : src.type === 'link' ? '🔗' : '💡'}</span>
+                        <span className="truncate">{src.displayName}</span>
+                      </div>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 font-bold ${
+                        isSelected ? 'bg-amber-200 text-amber-900' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {src.count}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
 
           <div className="h-px bg-slate-200"></div>

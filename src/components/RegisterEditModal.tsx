@@ -287,6 +287,26 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
     )
     .slice(0, 8);
 
+  // Compute existing books & sources for auto-completion & typo prevention
+  const existingBookSources = Array.from(
+    new Set(
+      existingIdeas
+        .map((i) => (i.sourceUrl || '').trim())
+        .filter((src) => src.startsWith('📚') || src.includes('[도서]'))
+        .map((src) => src.replace(/^📚\s*\[도서\]\s*/, '').trim())
+        .filter(Boolean)
+    )
+  );
+
+  const existingAllSources = Array.from(
+    new Set(
+      existingIdeas
+        .map((i) => (i.sourceUrl || '').trim())
+        .map((src) => src.replace(/^[📚📄💡🔗]\s*(\[.*?\])?\s*/, '').trim())
+        .filter(Boolean)
+    )
+  );
+
   const activeStarCount = hoverImportance !== null ? hoverImportance : importance;
 
   return (
@@ -473,17 +493,42 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
 
               <input
                 type="text"
+                list="existing-source-options"
                 value={sourceUrl}
                 onChange={(e) => setSourceUrl(e.target.value)}
                 placeholder={
                   sourceType === 'link'
                     ? 'https://...'
                     : sourceType === 'book'
-                      ? '도서명 및 저자'
+                      ? '도서명 및 저자 (예: 강신주의 노자 혹은 장자)'
                       : '출처 정보'
                 }
                 className="w-full px-2.5 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 bg-white text-slate-800"
               />
+
+              <datalist id="existing-source-options">
+                {(sourceType === 'book' ? existingBookSources : existingAllSources).map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+
+              {/* Quick source suggestion chips */}
+              {sourceType === 'book' && existingBookSources.length > 0 && (
+                <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                  <span className="text-[10px] font-bold text-amber-700">추천:</span>
+                  {existingBookSources.slice(0, 4).map((book) => (
+                    <button
+                      key={book}
+                      type="button"
+                      onClick={() => setSourceUrl(book)}
+                      className="text-[10px] px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold rounded border border-amber-200 transition-colors cursor-pointer truncate max-w-[130px]"
+                      title={book}
+                    >
+                      📚 {book}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
           </div>
