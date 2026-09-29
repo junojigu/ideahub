@@ -12,6 +12,7 @@ import { OwnerAuthModal } from './components/OwnerAuthModal';
 import { MergeNotesModal } from './components/MergeNotesModal';
 import { DEFAULT_IDEAS } from './data/defaultIdeas';
 import { Idea, GasConfig, SyncStatus } from './types';
+import { requestGasApi } from './utils/gasApi';
 
 const STORAGE_KEY_IDEAS = 'ideahub_vault_ideas_v2';
 const STORAGE_KEY_RECENT = 'ideahub_vault_recent_v2';
@@ -99,18 +100,10 @@ export default function App() {
     setSyncStatus((prev) => ({ ...prev, isSyncing: true }));
 
     try {
-      const response = await fetch('/api/gas/proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'getIdeasAndAnalysis',
-          gasUrl: gasConfig.gasUrl,
-        }),
+      const data = await requestGasApi({
+        action: 'getIdeasAndAnalysis',
+        gasUrl: gasConfig.gasUrl,
       });
-
-      if (!response.ok) throw new Error('GAS proxy request failed');
-
-      const data = await response.json();
 
       // Process setting sheet settings automatically
       if (data && data.settings) {
@@ -190,14 +183,10 @@ export default function App() {
       })
     );
 
-    fetch('/api/gas/proxy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'incrementViewCount',
-        id,
-        gasUrl: gasConfig.gasUrl,
-      }),
+    requestGasApi({
+      action: 'incrementViewCount',
+      id,
+      gasUrl: gasConfig.gasUrl,
     }).catch((err) => console.warn('Increment view error:', err));
   };
 
@@ -229,19 +218,15 @@ export default function App() {
       );
 
       // Call GAS Proxy async
-      fetch('/api/gas/proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'updateIdea',
-          id: ideaData.id,
-          title: ideaData.title,
-          content: ideaData.content,
-          tags: (ideaData.tags || []).join(','),
-          sourceUrl: ideaData.sourceUrl || '',
-          importance: ideaData.importance || 1,
-          gasUrl: gasConfig.gasUrl,
-        }),
+      requestGasApi({
+        action: 'updateIdea',
+        id: ideaData.id,
+        title: ideaData.title,
+        content: ideaData.content,
+        tags: (ideaData.tags || []).join(','),
+        sourceUrl: ideaData.sourceUrl || '',
+        importance: ideaData.importance || 1,
+        gasUrl: gasConfig.gasUrl,
       }).catch((err) => console.warn('GAS Update Error:', err));
     } else {
       // Create New
@@ -261,18 +246,14 @@ export default function App() {
 
       setIdeas((prev) => [newIdea, ...prev]);
 
-      fetch('/api/gas/proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'saveIdea',
-          title: newIdea.title,
-          content: newIdea.content,
-          tags: newIdea.tags.join(','),
-          sourceUrl: newIdea.sourceUrl,
-          importance: newIdea.importance,
-          gasUrl: gasConfig.gasUrl,
-        }),
+      requestGasApi({
+        action: 'saveIdea',
+        title: newIdea.title,
+        content: newIdea.content,
+        tags: newIdea.tags.join(','),
+        sourceUrl: newIdea.sourceUrl,
+        importance: newIdea.importance,
+        gasUrl: gasConfig.gasUrl,
       }).catch((err) => console.warn('GAS Save Error:', err));
     }
 
@@ -285,14 +266,10 @@ export default function App() {
     setIdeas((prev) => prev.filter((i) => String(i.id) !== String(id)));
     setRecentViewedIds((prev) => prev.filter((i) => i !== id));
 
-    fetch('/api/gas/proxy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'deleteIdea',
-        id,
-        gasUrl: gasConfig.gasUrl,
-      }),
+    requestGasApi({
+      action: 'deleteIdea',
+      id,
+      gasUrl: gasConfig.gasUrl,
     }).catch((err) => console.warn('GAS Delete Error:', err));
   };
 
@@ -304,14 +281,10 @@ export default function App() {
     setRecentViewedIds((prev) => prev.filter((i) => !ids.includes(i)));
 
     ids.forEach((id) => {
-      fetch('/api/gas/proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'deleteIdea',
-          id,
-          gasUrl: gasConfig.gasUrl,
-        }),
+      requestGasApi({
+        action: 'deleteIdea',
+        id,
+        gasUrl: gasConfig.gasUrl,
       }).catch((err) => console.warn('GAS Batch Delete Error:', err));
     });
   };
@@ -420,30 +393,22 @@ export default function App() {
     if (originalIdsToDelete && originalIdsToDelete.length > 0) {
       setRecentViewedIds((prev) => prev.filter((i) => !originalIdsToDelete.includes(i)));
       originalIdsToDelete.forEach((id) => {
-        fetch('/api/gas/proxy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'deleteIdea',
-            id,
-            gasUrl: gasConfig.gasUrl,
-          }),
+        requestGasApi({
+          action: 'deleteIdea',
+          id,
+          gasUrl: gasConfig.gasUrl,
         }).catch((err) => console.warn('GAS Delete Error:', err));
       });
     }
 
-    fetch('/api/gas/proxy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'saveIdea',
-        title: newMergedIdea.title,
-        content: newMergedIdea.content,
-        tags: newMergedIdea.tags.join(','),
-        sourceUrl: newMergedIdea.sourceUrl,
-        importance: newMergedIdea.importance,
-        gasUrl: gasConfig.gasUrl,
-      }),
+    requestGasApi({
+      action: 'saveIdea',
+      title: newMergedIdea.title,
+      content: newMergedIdea.content,
+      tags: newMergedIdea.tags.join(','),
+      sourceUrl: newMergedIdea.sourceUrl,
+      importance: newMergedIdea.importance,
+      gasUrl: gasConfig.gasUrl,
     }).catch((err) => console.warn('GAS Save Error:', err));
 
     setIsMergeModalOpen(false);
