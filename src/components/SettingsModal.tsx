@@ -391,10 +391,15 @@ function doPost(e) {
                   )}
                   <div className="text-xs">
                     <span className="font-extrabold">
-                      {syncStatus.connected ? 'Google Apps Script 연결 성공' : '스프레드시트 미연결 (로컬 모드 동작 중)'}
+                      {syncStatus.connected ? 'Google Apps Script 연결 성공' : '구글 시트 연동 대기 (로컬 모드)'}
                     </span>
+                    {syncStatus.message && (
+                      <p className={`text-[11px] font-semibold mt-0.5 leading-snug ${syncStatus.connected ? 'text-emerald-700' : 'text-rose-600'}`}>
+                        {syncStatus.message}
+                      </p>
+                    )}
                     {syncStatus.lastSyncedAt && (
-                      <p className="text-[11px] font-medium opacity-80 mt-0.5">
+                      <p className="text-[10px] font-medium opacity-75 mt-0.5">
                         최근 동기화: {syncStatus.lastSyncedAt}
                       </p>
                     )}
