@@ -80,6 +80,7 @@ export default function App() {
   const [isOwnerAuthenticated, setIsOwnerAuthenticated] = useState(false);
   const [remoteOwnerPin, setRemoteOwnerPin] = useState<string>('');
   const [todayRecIdea, setTodayRecIdea] = useState<Idea | null>(null);
+  const [saveErrorToast, setSaveErrorToast] = useState<string | null>(null);
 
   // Merge and Continuous Reading states
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
@@ -131,7 +132,20 @@ export default function App() {
       }
 
       if (data && Array.isArray(data.ideas) && data.ideas.length > 0) {
-        setIdeas(data.ideas);
+        // Merge remote ideas without wiping out freshly created local items
+        setIdeas((currentLocal) => {
+          const remoteIds = new Set(data.ideas.map((i: Idea) => String(i.id)));
+          const localOnlyRecent = currentLocal.filter((local) => {
+            if (remoteIds.has(String(local.id))) return false;
+            const tsMatch = String(local.id).match(/ID_(\d+)/);
+            if (tsMatch) {
+              const age = Date.now() - parseInt(tsMatch[1], 10);
+              return age < 30 * 60 * 1000; // Keep local items created within 30 minutes!
+            }
+            return false;
+          });
+          return [...localOnlyRecent, ...data.ideas];
+        });
         setSyncStatus({
           connected: true,
           isSyncing: false,
@@ -272,17 +286,37 @@ export default function App() {
         views: 1,
       };
 
+      // Optimistically add to local ideas so user sees it instantly
       setIdeas((prev) => [newIdea, ...prev]);
 
       requestGasApi({
         action: 'saveIdea',
+        id: newId,
         title: newIdea.title,
         content: newIdea.content,
         tags: newIdea.tags.join(','),
         sourceUrl: newIdea.sourceUrl,
         importance: newIdea.importance,
         gasUrl: gasConfig.gasUrl,
-      }).catch((err) => console.warn('GAS Save Error:', err));
+      })
+        .then((res) => {
+          if (res && res.status === 'ERROR') {
+            console.error('GAS Save Error Response:', res);
+            setSaveErrorToast(
+              `구글 시트 저장 실패: ${res.message || '오류 발생'} (구글 시트 Apps Script에 saveIdea 함수가 없습니다. 설정 > Code.gs를 복사하여 구글 시트에 업데이트해주세요!)`
+            );
+          } else {
+            // Success, sync back timestamp if any
+            setSyncStatus((prev) => ({
+              ...prev,
+              lastSyncedAt: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+            }));
+          }
+        })
+        .catch((err) => {
+          console.warn('GAS Save Error:', err);
+          setSaveErrorToast(`구글 시트 저장 통신 오류: ${err.message || '네트워크 오류'}`);
+        });
     }
 
     setEditingIdea(null);
@@ -489,6 +523,33 @@ export default function App() {
         syncStatus={syncStatus}
         onSyncGas={syncWithGas}
       />
+
+      {/* Save Error Alert Banner */}
+      {saveErrorToast && (
+        <div className="bg-rose-50 border-b border-rose-200 px-4 py-3 text-rose-900 text-xs font-semibold flex items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0" />
+            <span className="whitespace-pre-line leading-relaxed">{saveErrorToast}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => {
+                setSaveErrorToast(null);
+                handleOpenSettings();
+              }}
+              className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs cursor-pointer shadow-xs"
+            >
+              설정 열기
+            </button>
+            <button
+              onClick={() => setSaveErrorToast(null)}
+              className="text-rose-500 hover:text-rose-800 font-bold px-1.5 py-0.5 cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Tab Content */}
       <main className="flex-1 flex flex-col">

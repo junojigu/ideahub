@@ -139,11 +139,11 @@ function getIdeasAndAnalysis() {
 }
 
 // 새 지식 저장
-function saveIdea(title, content, tags, sourceUrl, importance) {
+function saveIdea(title, content, tags, sourceUrl, importance, id) {
   try {
     var ss = getSpreadsheet();
     var sheet = getOrCreateIdeasSheet(ss);
-    var newId = 'ID_' + new Date().getTime();
+    var newId = id || ('ID_' + new Date().getTime());
     var dateStr = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
     var tagsStr = Array.isArray(tags) ? tags.join(',') : (tags || '');
     
@@ -261,6 +261,11 @@ function batchSyncIdeas(ideas) {
 function doGet(e) {
   try {
     var action = (e && e.parameter) ? e.parameter.action : '';
+    if (action === 'saveIdea') {
+      var p = e.parameter;
+      var saveRes = saveIdea(p.title, p.content, p.tags, p.sourceUrl, p.importance, p.id);
+      return ContentService.createTextOutput(JSON.stringify(saveRes)).setMimeType(ContentService.MimeType.JSON);
+    }
     if (action === 'getIdeasAndAnalysis' || (e && e.parameter && e.parameter.api === 'true') || !action) {
       var data = getIdeasAndAnalysis();
       return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
@@ -279,7 +284,7 @@ function doPost(e) {
     var result = { status: 'ERROR', message: 'Unknown action' };
 
     if (action === 'saveIdea') {
-      result = saveIdea(params.title, params.content, params.tags, params.sourceUrl, params.importance);
+      result = saveIdea(params.title, params.content, params.tags, params.sourceUrl, params.importance, params.id);
     } else if (action === 'updateIdea') {
       result = updateIdea(params.id, params.title, params.content, params.tags, params.sourceUrl, params.importance);
     } else if (action === 'deleteIdea') {
