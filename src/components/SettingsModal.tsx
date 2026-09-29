@@ -72,14 +72,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
  * Google Apps Script (GAS) Backend Code for IdeaHub 지식창고
  * Spreadsheet ID: ${currentSheetId}
  */
-var SPREADSHEET_ID = '${currentSheetId}';
+var SPREADSHEET_ID = ''; // 비워두면 현재 열려 있는 스프레드시트에 자동으로 저장됩니다.
 
 function getSpreadsheet() {
   try {
-    return SPREADSHEET_ID ? SpreadsheetApp.openById(SPREADSHEET_ID) : SpreadsheetApp.getActiveSpreadsheet();
-  } catch(e) {
-    return SpreadsheetApp.getActiveSpreadsheet();
+    var active = SpreadsheetApp.getActiveSpreadsheet();
+    if (active) return active;
+  } catch(e) {}
+  if (SPREADSHEET_ID) {
+    try {
+      return SpreadsheetApp.openById(SPREADSHEET_ID);
+    } catch(e2) {}
   }
+  return SpreadsheetApp.getActive();
 }
 
 function getOrCreateIdeasSheet(ss) {
