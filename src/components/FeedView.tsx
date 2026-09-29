@@ -73,9 +73,18 @@ export const FeedView: React.FC<FeedViewProps> = ({
   const [tagSortOrder, setTagSortOrder] = useState<'count' | 'alphabetical'>('count');
   const [hoveredTag, setHoveredTag] = useState<string | null>(null);
 
-  // Compute Book Shelf / Source statistics
+  // Compute Book Shelf / Source statistics sorted by: 도서 -> 문서 -> 메모 -> 웹링크
   const sourceStats = useMemo(() => {
-    const map = new Map<string, { rawSource: string; count: number; displayName: string; type: 'book' | 'general' | 'link' | 'other' }>();
+    const map = new Map<
+      string,
+      {
+        rawSource: string;
+        count: number;
+        displayName: string;
+        category: 'book' | 'document' | 'memo' | 'link';
+      }
+    >();
+
     ideas.forEach((idea) => {
       const src = (idea.sourceUrl || '').trim();
       if (!src) return;
@@ -83,10 +92,10 @@ export const FeedView: React.FC<FeedViewProps> = ({
       if (!clean) return;
 
       const mainTitle = extractMainBookTitle(src);
-      const type = getSourceType(src);
+      const category = getSourceCategory(src); // 'book' | 'document' | 'memo' | 'link'
 
       // Group key: for books, group by main title so p.1, p.2 are grouped together
-      const key = type === 'book' ? mainTitle.toLowerCase() : clean.toLowerCase();
+      const key = category === 'book' ? mainTitle.toLowerCase() : clean.toLowerCase();
       const existing = map.get(key);
 
       if (existing) {
@@ -95,13 +104,32 @@ export const FeedView: React.FC<FeedViewProps> = ({
         map.set(key, {
           rawSource: src,
           count: 1,
-          displayName: type === 'book' ? mainTitle : clean,
-          type,
+          displayName: category === 'book' ? mainTitle : clean,
+          category,
         });
       }
     });
 
-    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+    // Requested Priority Order: 1. 도서 -> 2. 문서 -> 3. 메모 -> 4. 웹링크
+    const categoryOrder: Record<string, number> = {
+      book: 1,      // 1. 도서
+      document: 2,  // 2. 문서
+      memo: 3,      // 3. 메모
+      link: 4,      // 4. 웹링크
+    };
+
+    return Array.from(map.values()).sort((a, b) => {
+      const orderA = categoryOrder[a.category] ?? 99;
+      const orderB = categoryOrder[b.category] ?? 99;
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      // Within each category, sort by count descending (most frequent first)
+      if (b.count !== a.count) {
+        return b.count - a.count;
+      }
+      return a.displayName.localeCompare(b.displayName, 'ko');
+    });
   }, [ideas]);
 
   // Compute Source Category counts (웹링크, 도서, 문서, 메모)
@@ -855,32 +883,64 @@ export const FeedView: React.FC<FeedViewProps> = ({
               )}
             </div>
 
-            <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+            <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
               {sourceStats.length === 0 ? (
                 <p className="text-xs text-slate-400 py-1">등록된 출처가 없습니다.</p>
               ) : (
-                sourceStats.map((src) => {
+                sourceStats.map((src, idx) => {
                   const isSelected = selectedSource?.toLowerCase() === src.displayName.toLowerCase();
+                  const prevCategory = idx > 0 ? sourceStats[idx - 1].category : null;
+                  const isNewCategory = src.category !== prevCategory;
+                  const catLabel =
+                    src.category === 'book'
+                      ? '📚 도서'
+                      : src.category === 'document'
+                      ? '📄 문서'
+                      : src.category === 'memo'
+                      ? '💡 메모'
+                      : '🔗 웹링크';
+
+                  const formattedName =
+                    src.category === 'book' && !src.displayName.startsWith('[도서]')
+                      ? `[도서] ${src.displayName}`
+                      : src.category === 'document' && !src.displayName.startsWith('[문서]')
+                      ? `[문서] ${src.displayName}`
+                      : src.category === 'memo' && !src.displayName.startsWith('[메모]')
+                      ? `[메모] ${src.displayName}`
+                      : src.displayName;
+
                   return (
-                    <button
-                      key={src.displayName}
-                      onClick={() => setSelectedSource(isSelected ? null : src.displayName)}
-                      className={`w-full px-3 py-2 rounded-xl text-xs text-left transition-all cursor-pointer flex items-center justify-between gap-2 border ${
-                        isSelected
-                          ? 'bg-amber-100 text-amber-950 font-black border-amber-300 shadow-2xs'
-                          : 'bg-white hover:bg-amber-50/70 text-slate-700 font-semibold border-slate-200 hover:border-amber-200'
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                        <span className="shrink-0">{src.type === 'book' ? '📚' : src.type === 'general' ? '📄' : src.type === 'link' ? '🔗' : '💡'}</span>
-                        <span className="truncate">{src.displayName}</span>
-                      </div>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 font-bold ${
-                        isSelected ? 'bg-amber-200 text-amber-900' : 'bg-slate-100 text-slate-500'
-                      }`}>
-                        {src.count}
-                      </span>
-                    </button>
+                    <React.Fragment key={src.displayName}>
+                      {isNewCategory && (
+                        <div className="pt-2.5 pb-1 text-[11px] font-black text-slate-600 flex items-center justify-between border-t border-slate-200/80 first:border-t-0 first:pt-0">
+                          <span className="flex items-center gap-1.5">{catLabel}</span>
+                          <span className="text-[10px] text-slate-400 font-mono font-medium">
+                            {sourceCategoryCounts[src.category]}개
+                          </span>
+                        </div>
+                      )}
+                      <button
+                        key={src.displayName}
+                        onClick={() => setSelectedSource(isSelected ? null : src.displayName)}
+                        className={`w-full px-3 py-2 rounded-xl text-xs text-left transition-all cursor-pointer flex items-center justify-between gap-2 border ${
+                          isSelected
+                            ? 'bg-amber-100 text-amber-950 font-black border-amber-300 shadow-2xs'
+                            : 'bg-white hover:bg-slate-50 text-slate-700 font-semibold border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <span className="shrink-0">
+                            {src.category === 'book' ? '📚' : src.category === 'document' ? '📄' : src.category === 'memo' ? '💡' : '🔗'}
+                          </span>
+                          <span className="truncate">{formattedName}</span>
+                        </div>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 font-bold ${
+                          isSelected ? 'bg-amber-200 text-amber-900' : 'bg-slate-100 text-slate-500'
+                        }`}>
+                          {src.count}
+                        </span>
+                      </button>
+                    </React.Fragment>
                   );
                 })
               )}
