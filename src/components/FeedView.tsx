@@ -139,9 +139,14 @@ export const FeedView: React.FC<FeedViewProps> = ({
   // Sort ideas with reliable date timestamp parsing
   const sortedIdeas = [...filteredIdeas].sort((a, b) => {
     if (sortField === 'date') {
-      const timeA = parseTimestamp(a.date);
-      const timeB = parseTimestamp(b.date);
-      return sortDir === 'asc' ? timeA - timeB : timeB - timeA;
+      const timeA = parseTimestamp(a.date, a.id);
+      const timeB = parseTimestamp(b.date, b.id);
+      if (timeA !== timeB) {
+        return sortDir === 'asc' ? timeA - timeB : timeB - timeA;
+      }
+      return sortDir === 'asc'
+        ? String(a.id || '').localeCompare(String(b.id || ''))
+        : String(b.id || '').localeCompare(String(a.id || ''));
     }
 
     if (sortField === 'views' || sortField === 'importance') {
@@ -588,7 +593,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
 
                     {/* Metadata line */}
                     <div className="text-xs text-slate-400 font-medium flex items-center gap-2">
-                      <span>{formatDate(idea.date)}</span>
+                      <span>{formatDate(idea.date, idea.id)}</span>
                       <span>·</span>
                       <span className="flex items-center gap-1 text-slate-500">
                         <Eye className="w-3.5 h-3.5 text-slate-400" />

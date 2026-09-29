@@ -18,7 +18,7 @@ const STORAGE_KEY_IDEAS = 'ideahub_vault_ideas_v2';
 const STORAGE_KEY_RECENT = 'ideahub_vault_recent_v2';
 const STORAGE_KEY_GAS_URL = 'ideahub_vault_gas_url_v2';
 
-const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyTP0hfXvAKpmC1USIytbGBO3Mrs1KK_36aeIaDi6Mo5R_nwGmo4Ln_XknsyEWjJxQz/exec';
+const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwxMyj2Ztb5qtIYGHgU2MipDl6hQOv-6xP18EPHdNkPfE0ndN6d6gaCcvTgNgApGqUw/exec';
 
 export default function App() {
   const [ideas, setIdeas] = useState<Idea[]>(() => {
@@ -47,7 +47,11 @@ export default function App() {
   });
 
   const [gasConfig, setGasConfig] = useState<GasConfig>(() => {
-    const savedUrl = localStorage.getItem(STORAGE_KEY_GAS_URL) || DEFAULT_GAS_URL;
+    let savedUrl = localStorage.getItem(STORAGE_KEY_GAS_URL);
+    if (!savedUrl || savedUrl.includes('AKfycbyTP0hfXvAKpmC1USIytbGBO3Mrs1KK_36aeIaDi6Mo5R_nwGmo4Ln_XknsyEWjJxQz')) {
+      savedUrl = DEFAULT_GAS_URL;
+      localStorage.setItem(STORAGE_KEY_GAS_URL, DEFAULT_GAS_URL);
+    }
     return {
       gasUrl: savedUrl,
       spreadsheetId: '1ObuXFixOOAclKpymPguwWfllJyCA1T457k35hwP4R30',

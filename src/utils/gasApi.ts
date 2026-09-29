@@ -11,7 +11,7 @@ export interface GasProxyPayload {
 
 export async function requestGasApi(payload: GasProxyPayload): Promise<any> {
   const { gasUrl, action, ...rest } = payload;
-  const targetUrl = gasUrl || 'https://script.google.com/macros/s/AKfycbyTP0hfXvAKpmC1USIytbGBO3Mrs1KK_36aeIaDi6Mo5R_nwGmo4Ln_XknsyEWjJxQz/exec';
+  const targetUrl = gasUrl || 'https://script.google.com/macros/s/AKfycbwxMyj2Ztb5qtIYGHgU2MipDl6hQOv-6xP18EPHdNkPfE0ndN6d6gaCcvTgNgApGqUw/exec';
 
   // 1. Try local proxy (/api/gas/proxy) first
   try {

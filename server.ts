@@ -9,7 +9,7 @@ const PORT = 3000;
 app.use(express.json({ limit: "10mb" }));
 
 // Default GAS Web App URL from prompt
-const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbyTP0hfXvAKpmC1USIytbGBO3Mrs1KK_36aeIaDi6Mo5R_nwGmo4Ln_XknsyEWjJxQz/exec";
+const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbwxMyj2Ztb5qtIYGHgU2MipDl6hQOv-6xP18EPHdNkPfE0ndN6d6gaCcvTgNgApGqUw/exec";
 
 // Initialize Gemini Client
 const getGeminiClient = () => {
