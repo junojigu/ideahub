@@ -48,13 +48,17 @@ export default function App() {
 
   const [gasConfig, setGasConfig] = useState<GasConfig>(() => {
     let savedUrl = localStorage.getItem(STORAGE_KEY_GAS_URL);
-    if (!savedUrl || savedUrl.includes('AKfycbyTP0hfXvAKpmC1USIytbGBO3Mrs1KK_36aeIaDi6Mo5R_nwGmo4Ln_XknsyEWjJxQz')) {
+    if (
+      !savedUrl ||
+      savedUrl.includes('AKfycbyTP0hfXvAKpmC1USIytbGBO3Mrs1KK_36aeIaDi6Mo5R_nwGmo4Ln_XknsyEWjJxQz') ||
+      savedUrl.includes('AKfycbyOe5yknAqXIQmwcbBsLeVip8CTAuRfPjWTQSU3XE_Aw3NA9SVpRWS6mchj56-56_IB')
+    ) {
       savedUrl = DEFAULT_GAS_URL;
       localStorage.setItem(STORAGE_KEY_GAS_URL, DEFAULT_GAS_URL);
     }
     return {
       gasUrl: savedUrl,
-      spreadsheetId: '1ObuXFixOOAclKpymPguwWfllJyCA1T457k35hwP4R30',
+      spreadsheetId: '1pnjEJN6l_a3aDI6Q_GSWzeUnpFAxmcWqQ6c9Nanu7Co',
       autoSync: true,
     };
   });
@@ -114,13 +118,19 @@ export default function App() {
       if (data && data.settings) {
         if (data.settings.deployUrl && typeof data.settings.deployUrl === 'string' && data.settings.deployUrl.startsWith('https://script.google.com')) {
           const freshUrl = data.settings.deployUrl.trim();
-          setGasConfig((prev) => {
-            if (prev.gasUrl !== freshUrl) {
-              localStorage.setItem(STORAGE_KEY_GAS_URL, freshUrl);
-              return { ...prev, gasUrl: freshUrl };
-            }
-            return prev;
-          });
+          const isOutdated =
+            freshUrl.includes('AKfycbyTP0hfXvAKpmC1USIytbGBO3Mrs1KK_36aeIaDi6Mo5R_nwGmo4Ln_XknsyEWjJxQz') ||
+            freshUrl.includes('AKfycbyOe5yknAqXIQmwcbBsLeVip8CTAuRfPjWTQSU3XE_Aw3NA9SVpRWS6mchj56-56_IB');
+
+          if (!isOutdated) {
+            setGasConfig((prev) => {
+              if (prev.gasUrl !== freshUrl) {
+                localStorage.setItem(STORAGE_KEY_GAS_URL, freshUrl);
+                return { ...prev, gasUrl: freshUrl };
+              }
+              return prev;
+            });
+          }
         }
         if (data.settings.ownerPin) {
           setRemoteOwnerPin(String(data.settings.ownerPin).trim());
