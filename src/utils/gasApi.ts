@@ -4,7 +4,7 @@
  */
 
 export interface GasProxyPayload {
-  action: 'getIdeasAndAnalysis' | 'saveIdea' | 'updateIdea' | 'deleteIdea' | 'incrementViewCount';
+  action: 'getIdeasAndAnalysis' | 'saveIdea' | 'updateIdea' | 'deleteIdea' | 'incrementViewCount' | 'batchSyncIdeas';
   gasUrl: string;
   [key: string]: any;
 }

@@ -122,6 +122,10 @@ export default function App() {
         }
       }
 
+      if (data && data.status === 'ERROR') {
+        throw new Error(data.message || 'Google Apps Script 반환 오류');
+      }
+
       if (data && Array.isArray(data.ideas) && data.ideas.length > 0) {
         setIdeas(data.ideas);
         setSyncStatus({
@@ -130,20 +134,22 @@ export default function App() {
           lastSyncedAt: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
           message: '구글 스프레드시트와 성공적으로 동기화되었습니다.',
         });
-      } else {
+      } else if (data && Array.isArray(data.ideas) && data.ideas.length === 0) {
         setSyncStatus({
           connected: true,
           isSyncing: false,
           lastSyncedAt: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-          message: '시트에 연결되었으나 보관된 데이터가 없습니다.',
+          message: '시트에 연결되었으나 보관된 데이터가 0개입니다.',
         });
+      } else {
+        throw new Error(data?.message || '시트 응답 형식 오류');
       }
     } catch (error: any) {
       console.warn('GAS Sync warning:', error?.message);
       setSyncStatus({
         connected: false,
         isSyncing: false,
-        message: '시트 동기화 실패 (로컬 데이터로 작동합니다)',
+        message: `시트 동기화 실패 (${error?.message || '연결 오류'})`,
       });
     }
   }, [gasConfig.gasUrl]);
@@ -359,6 +365,32 @@ export default function App() {
       }
     } catch (e: any) {
       alert(`JSON 파일 파싱 오류: ${e?.message}`);
+    }
+  };
+
+  // Push All Ideas to Google Sheets (Master Sync)
+  const handleBatchPushToGas = async () => {
+    if (!confirm(`현재 브라우저에 저장된 ${ideas.length}개의 지식을 구글 스프레드시트에 모두 덮어쓰시겠습니까?\n\n(모바일과 PC의 데이터를 100% 동일하게 일치시키는 마스터 동기화입니다)`)) {
+      return;
+    }
+
+    setSyncStatus((prev) => ({ ...prev, isSyncing: true }));
+    try {
+      const res = await requestGasApi({
+        action: 'batchSyncIdeas',
+        ideas: ideas,
+        gasUrl: gasConfig.gasUrl,
+      });
+
+      if (res && res.status === 'ERROR') {
+        throw new Error(res.message || '일괄 동기화 실패');
+      }
+
+      alert(`성공적으로 ${ideas.length}개의 지식이 구글 시트에 일괄 저장되었습니다!\n이제 어떤 기기(모바일, PC)에서 접속하든 이 데이터가 동기화됩니다.`);
+      syncWithGas();
+    } catch (e: any) {
+      alert(`구글 시트 일괄 저장 실패: ${e?.message}\n\n[Code.gs 소스] 탭의 코드를 구글 스프레드시트 Apps Script 편집기에 복사하여 [새 배포]를 완료하셨는지 확인해주세요.`);
+      setSyncStatus((prev) => ({ ...prev, isSyncing: false }));
     }
   };
 
@@ -594,6 +626,8 @@ export default function App() {
         onChangePageSize={setPageSize}
         onExportData={handleExportData}
         onImportData={handleImportData}
+        onBatchPushToGas={handleBatchPushToGas}
+        ideasCount={ideas.length}
       />
 
     </div>

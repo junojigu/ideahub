@@ -13,6 +13,8 @@ interface SettingsModalProps {
   onChangePageSize: (size: number) => void;
   onExportData: (format: 'json' | 'csv') => void;
   onImportData: (jsonContent: string) => void;
+  onBatchPushToGas?: () => void;
+  ideasCount?: number;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -26,6 +28,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onChangePageSize,
   onExportData,
   onImportData,
+  onBatchPushToGas,
+  ideasCount = 0,
 }) => {
   const [activeTab, setActiveTab] = useState<'gas' | 'code' | 'data'>('gas');
   const [urlInput, setUrlInput] = useState(gasConfig.gasUrl);
@@ -70,10 +74,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
  */
 var SPREADSHEET_ID = '${currentSheetId}';
 
+function getSpreadsheet() {
+  try {
+    return SPREADSHEET_ID ? SpreadsheetApp.openById(SPREADSHEET_ID) : SpreadsheetApp.getActiveSpreadsheet();
+  } catch(e) {
+    return SpreadsheetApp.getActiveSpreadsheet();
+  }
+}
+
+function getOrCreateIdeasSheet(ss) {
+  var sheet = ss.getSheetByName('Ideas') || ss.getSheetByName('ideas') || ss.getSheets()[0];
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['ID', 'Date', 'Title', 'Content', 'Tags', 'Source_URL', 'Importance', 'Views']);
+  }
+  return sheet;
+}
+
 // setting 시트에서 소유자 비밀번호(B1) 및 Deploy URL(B3) 읽기
 function getAppSettings() {
   try {
-    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var ss = getSpreadsheet();
     var sheet = ss.getSheetByName('setting') || ss.getSheetByName('Setting') || ss.getSheetByName('Settings');
     if (!sheet) return { ownerPin: '', deployUrl: '' };
 
@@ -85,10 +105,11 @@ function getAppSettings() {
   }
 }
 
+// 지식 목록 전체 가져오기
 function getIdeasAndAnalysis() {
   try {
-    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    var sheet = ss.getSheetByName('Ideas') || ss.getSheets()[0];
+    var ss = getSpreadsheet();
+    var sheet = getOrCreateIdeasSheet(ss);
     var data = sheet.getDataRange().getValues();
     var ideas = [];
     
@@ -97,7 +118,7 @@ function getIdeasAndAnalysis() {
       if (row[0] || row[2]) {
         ideas.push({
           id: String(row[0] || ('ID_' + i)),
-          date: row[1] ? String(row[1]).split('T')[0] : new Date().toISOString().split('T')[0],
+          date: row[1] ? String(row[1]).split('T')[0] : Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd'),
           title: String(row[2] || '제목 없음'),
           content: String(row[3] || ''),
           tags: row[4] ? String(row[4]).split(',').map(function(t) { return t.trim(); }) : ['일반'],
@@ -117,16 +138,136 @@ function getIdeasAndAnalysis() {
   }
 }
 
+// 새 지식 저장
+function saveIdea(title, content, tags, sourceUrl, importance) {
+  try {
+    var ss = getSpreadsheet();
+    var sheet = getOrCreateIdeasSheet(ss);
+    var newId = 'ID_' + new Date().getTime();
+    var dateStr = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
+    var tagsStr = Array.isArray(tags) ? tags.join(',') : (tags || '');
+    
+    sheet.appendRow([newId, dateStr, title || '', content || '', tagsStr, sourceUrl || '', importance || 1, 1]);
+    return { status: 'SUCCESS', id: newId, message: '저장 완료' };
+  } catch(err) {
+    return { status: 'ERROR', message: err.toString() };
+  }
+}
+
+// 기존 지식 수정
+function updateIdea(id, title, content, tags, sourceUrl, importance) {
+  try {
+    var ss = getSpreadsheet();
+    var sheet = getOrCreateIdeasSheet(ss);
+    var data = sheet.getDataRange().getValues();
+    var tagsStr = Array.isArray(tags) ? tags.join(',') : (tags || '');
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(id)) {
+        var row = i + 1;
+        if (title !== undefined) sheet.getRange(row, 3).setValue(title);
+        if (content !== undefined) sheet.getRange(row, 4).setValue(content);
+        if (tags !== undefined) sheet.getRange(row, 5).setValue(tagsStr);
+        if (sourceUrl !== undefined) sheet.getRange(row, 6).setValue(sourceUrl);
+        if (importance !== undefined) sheet.getRange(row, 7).setValue(importance);
+        return { status: 'SUCCESS', message: '수정 완료' };
+      }
+    }
+    return { status: 'ERROR', message: '해당 ID를 찾을 수 없습니다: ' + id };
+  } catch(err) {
+    return { status: 'ERROR', message: err.toString() };
+  }
+}
+
+// 지식 삭제
+function deleteIdea(id) {
+  try {
+    var ss = getSpreadsheet();
+    var sheet = getOrCreateIdeasSheet(ss);
+    var data = sheet.getDataRange().getValues();
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(id)) {
+        sheet.deleteRow(i + 1);
+        return { status: 'SUCCESS', message: '삭제 완료' };
+      }
+    }
+    return { status: 'ERROR', message: '삭제할 항목을 찾을 수 없습니다: ' + id };
+  } catch(err) {
+    return { status: 'ERROR', message: err.toString() };
+  }
+}
+
+// 조회수 증가
+function incrementViewCount(id) {
+  try {
+    var ss = getSpreadsheet();
+    var sheet = getOrCreateIdeasSheet(ss);
+    var data = sheet.getDataRange().getValues();
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(id)) {
+        var currentViews = Number(data[i][7] || 0);
+        sheet.getRange(i + 1, 8).setValue(currentViews + 1);
+        return { status: 'SUCCESS' };
+      }
+    }
+    return { status: 'NOT_FOUND' };
+  } catch(err) {
+    return { status: 'ERROR', message: err.toString() };
+  }
+}
+
+// 여러 개 일괄 업로드 (초기 동기화 및 덮어쓰기용)
+function batchSyncIdeas(ideas) {
+  try {
+    if (!Array.isArray(ideas) || ideas.length === 0) {
+      return { status: 'ERROR', message: 'No ideas provided' };
+    }
+    var ss = getSpreadsheet();
+    var sheet = getOrCreateIdeasSheet(ss);
+    
+    // 기존 데이터 행 비우기 (헤더 행 제외)
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).clearContent();
+    }
+    
+    var rows = [];
+    for (var i = 0; i < ideas.length; i++) {
+      var it = ideas[i];
+      rows.push([
+        it.id || ('ID_' + (i + 1)),
+        it.date || Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd'),
+        it.title || '',
+        it.content || '',
+        Array.isArray(it.tags) ? it.tags.join(',') : (it.tags || ''),
+        it.sourceUrl || '',
+        it.importance || 1,
+        it.views || 0
+      ]);
+    }
+    
+    if (rows.length > 0) {
+      sheet.getRange(2, 1, rows.length, 8).setValues(rows);
+    }
+    
+    return { status: 'SUCCESS', count: rows.length, message: '일괄 동기화 완료' };
+  } catch(err) {
+    return { status: 'ERROR', message: err.toString() };
+  }
+}
+
 function doGet(e) {
   try {
-    if (e && e.parameter && (e.parameter.action === 'getIdeasAndAnalysis' || e.parameter.api === 'true')) {
+    var action = (e && e.parameter) ? e.parameter.action : '';
+    if (action === 'getIdeasAndAnalysis' || (e && e.parameter && e.parameter.api === 'true') || !action) {
       var data = getIdeasAndAnalysis();
       return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
     }
-    var template = HtmlService.createTemplateFromFile('Index');
-    return template.evaluate().setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL).setTitle('IdeaHub 지식창고');
+    return ContentService.createTextOutput(JSON.stringify({ status: 'OK', message: 'IdeaHub GAS API' })).setMimeType(ContentService.MimeType.JSON);
   } catch(err) {
-    return ContentService.createTextOutput(JSON.stringify({ status: 'ERROR', message: err.toString() }));
+    return ContentService.createTextOutput(JSON.stringify({ status: 'ERROR', message: err.toString() })).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
@@ -143,6 +284,10 @@ function doPost(e) {
       result = updateIdea(params.id, params.title, params.content, params.tags, params.sourceUrl, params.importance);
     } else if (action === 'deleteIdea') {
       result = deleteIdea(params.id);
+    } else if (action === 'incrementViewCount') {
+      result = incrementViewCount(params.id);
+    } else if (action === 'batchSyncIdeas') {
+      result = batchSyncIdeas(params.ideas);
     } else if (action === 'getIdeasAndAnalysis') {
       result = getIdeasAndAnalysis();
     }
@@ -307,6 +452,28 @@ function doPost(e) {
                   <option value={30}>30개씩 보기</option>
                 </select>
               </div>
+
+              {/* Push All Ideas to Sheet (Master Sync) */}
+              {onBatchPushToGas && (
+                <div className="space-y-2 bg-blue-50/70 p-4 rounded-2xl border border-blue-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-xs font-extrabold text-blue-900">
+                        현재 지식({ideasCount}개)을 구글 시트로 일괄 내보내기 (마스터 동기화)
+                      </h4>
+                      <p className="text-[11px] text-blue-700 mt-0.5 leading-relaxed">
+                        현재 화면의 모든 지식을 구글 스프레드시트에 통째로 저장하여 모바일과 PC의 데이터를 100% 완벽하게 일치시킵니다.
+                      </p>
+                    </div>
+                    <button
+                      onClick={onBatchPushToGas}
+                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-2xs transition-all cursor-pointer shrink-0"
+                    >
+                      시트로 일괄 동기화
+                    </button>
+                  </div>
+                </div>
+              )}
 
             </div>
           )}
