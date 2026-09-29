@@ -148,9 +148,27 @@ export default function App() {
     }
   }, [gasConfig.gasUrl]);
 
-  // Initial sync attempt
+  // Initial sync attempt & auto-sync when returning to the tab
   useEffect(() => {
     syncWithGas();
+
+    const handleFocus = () => {
+      syncWithGas();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncWithGas();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [syncWithGas]);
 
   // Refresh Today Recommendation
