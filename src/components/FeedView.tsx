@@ -7,6 +7,7 @@ import {
 import { Idea } from '../types';
 import { formatDate, parseTimestamp } from '../utils/dateUtils';
 import { renderHighlightedText } from '../utils/highlightUtils';
+import { cleanSourceTitle, extractMainBookTitle, getSourceType } from '../utils/sourceUtils';
 import { ConfirmModal } from './ConfirmModal';
 
 interface FeedViewProps {
@@ -69,15 +70,15 @@ export const FeedView: React.FC<FeedViewProps> = ({
     ideas.forEach((idea) => {
       const src = (idea.sourceUrl || '').trim();
       if (!src) return;
-      const clean = src.replace(/^[📚📄💡🔗]\s*(\[.*?\])?\s*/, '').trim();
+      const clean = cleanSourceTitle(src);
       if (!clean) return;
 
-      const key = clean.toLowerCase();
+      const mainTitle = extractMainBookTitle(src);
+      const type = getSourceType(src);
+
+      // Group key: for books, group by main title so p.1, p.2 are grouped together
+      const key = type === 'book' ? mainTitle.toLowerCase() : clean.toLowerCase();
       const existing = map.get(key);
-      const isBook = src.startsWith('📚') || src.includes('[도서]');
-      const isGeneral = src.startsWith('📄') || src.includes('[일반]');
-      const isLink = src.startsWith('http') || src.startsWith('🔗');
-      const type = isBook ? 'book' : isGeneral ? 'general' : isLink ? 'link' : 'other';
 
       if (existing) {
         existing.count += 1;
@@ -85,7 +86,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
         map.set(key, {
           rawSource: src,
           count: 1,
-          displayName: clean,
+          displayName: type === 'book' ? mainTitle : clean,
           type,
         });
       }
@@ -105,9 +106,11 @@ export const FeedView: React.FC<FeedViewProps> = ({
   const filteredIdeas = ideas.filter((idea) => {
     // Source filter (Book Shelf)
     if (selectedSource) {
-      const cleanTarget = selectedSource.replace(/^[📚📄💡🔗]\s*(\[.*?\])?\s*/, '').trim().toLowerCase();
-      const cleanIdea = (idea.sourceUrl || '').replace(/^[📚📄💡🔗]\s*(\[.*?\])?\s*/, '').trim().toLowerCase();
-      if (cleanIdea !== cleanTarget) return false;
+      const targetKey = selectedSource.trim().toLowerCase();
+      const cleanIdea = cleanSourceTitle(idea.sourceUrl).toLowerCase();
+      const mainIdea = extractMainBookTitle(idea.sourceUrl).toLowerCase();
+      const matchesSource = cleanIdea.includes(targetKey) || mainIdea.includes(targetKey) || targetKey.includes(mainIdea);
+      if (!matchesSource) return false;
     }
 
     // Tag filter
@@ -259,11 +262,14 @@ export const FeedView: React.FC<FeedViewProps> = ({
   // Helper for source badges
   const renderSourceBadge = (sourceStr?: string) => {
     if (!sourceStr) return null;
-    const clean = sourceStr.trim();
-    const sourceDisplayName = clean.replace(/^[📚📄💡🔗]\s*(\[.*?\])?\s*/, '').trim();
+    const clean = cleanSourceTitle(sourceStr);
+    if (!clean) return null;
 
-    if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('www.') || clean.startsWith('🔗')) {
-      const href = clean.replace(/^🔗\s*/, '').startsWith('www.') ? `https://${clean}` : clean.replace(/^🔗\s*/, '');
+    const mainTitle = extractMainBookTitle(sourceStr);
+    const type = getSourceType(sourceStr);
+
+    if (type === 'link') {
+      const href = clean.startsWith('www.') ? `https://${clean}` : clean;
       return (
         <a
           href={href.startsWith('http') ? href : `https://${href}`}
@@ -274,49 +280,49 @@ export const FeedView: React.FC<FeedViewProps> = ({
           title="원문 링크"
         >
           <ExternalLink className="w-3 h-3" />
-          <span className="max-w-[120px] truncate">{clean.replace(/^🔗\s*/, '')}</span>
+          <span className="max-w-[120px] truncate">{clean}</span>
         </a>
       );
     }
 
-    if (clean.startsWith('📚') || clean.includes('[도서]')) {
+    if (type === 'book') {
       return (
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            setSelectedSource((prev) => (prev === sourceDisplayName ? null : sourceDisplayName));
+            setSelectedSource((prev) => (prev === mainTitle ? null : mainTitle));
           }}
           className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-lg border transition-all cursor-pointer shrink-0 ${
-            selectedSource === sourceDisplayName
+            selectedSource === mainTitle
               ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
               : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200'
           }`}
-          title="클릭하여 이 책의 메모만 모아보기"
+          title={`클릭하여 '${mainTitle}' 메모만 모아보기`}
         >
           <Book className="w-3 h-3 text-amber-600" />
-          <span className="max-w-[120px] truncate">{sourceDisplayName}</span>
+          <span className="max-w-[120px] truncate">{clean}</span>
         </button>
       );
     }
 
-    if (clean.startsWith('📄') || clean.includes('[일반]')) {
+    if (type === 'general') {
       return (
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            setSelectedSource((prev) => (prev === sourceDisplayName ? null : sourceDisplayName));
+            setSelectedSource((prev) => (prev === clean ? null : clean));
           }}
           className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-lg border transition-all cursor-pointer shrink-0 ${
-            selectedSource === sourceDisplayName
+            selectedSource === clean
               ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
               : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-200'
           }`}
-          title="클릭하여 이 문서의 메모만 모아보기"
+          title="클릭하여 이 문서 메모만 모아보기"
         >
           <FileText className="w-3 h-3 text-emerald-600" />
-          <span className="max-w-[120px] truncate">{sourceDisplayName}</span>
+          <span className="max-w-[120px] truncate">{clean}</span>
         </button>
       );
     }
@@ -326,17 +332,17 @@ export const FeedView: React.FC<FeedViewProps> = ({
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          setSelectedSource((prev) => (prev === sourceDisplayName ? null : sourceDisplayName));
+          setSelectedSource((prev) => (prev === clean ? null : clean));
         }}
         className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-lg border transition-all cursor-pointer shrink-0 ${
-          selectedSource === sourceDisplayName
+          selectedSource === clean
             ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
             : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-indigo-200'
         }`}
         title="클릭하여 이 출처 메모만 모아보기"
       >
         <Lightbulb className="w-3 h-3 text-indigo-600" />
-        <span className="max-w-[120px] truncate">{sourceDisplayName}</span>
+        <span className="max-w-[120px] truncate">{clean}</span>
       </button>
     );
   };

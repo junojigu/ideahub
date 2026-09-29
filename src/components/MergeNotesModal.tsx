@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { Idea } from '../types';
 import { normalizeMarkdown } from '../utils/markdownUtils';
+import { cleanSourceTitle, extractMainBookTitle } from '../utils/sourceUtils';
 
 interface MergeNotesModalProps {
   isOpen: boolean;
@@ -41,18 +42,13 @@ export const MergeNotesModal: React.FC<MergeNotesModalProps> = ({
 
       // Detect common source
       const firstSource = selectedIdeas[0]?.sourceUrl || '';
-      const allShareSameSource = selectedIdeas.every((i) => (i.sourceUrl || '').trim() === firstSource.trim());
-      const initialSource = allShareSameSource ? firstSource : '';
+      const firstBookTitle = extractMainBookTitle(firstSource);
+      const allShareSameSource = selectedIdeas.every((i) => extractMainBookTitle(i.sourceUrl) === firstBookTitle);
+      const initialSource = allShareSameSource ? (firstSource.includes('[도서]') || firstSource.includes('📚') ? `📚 [도서] ${firstBookTitle}` : firstSource) : '';
       setSourceUrl(initialSource);
 
-      // Extract book title or base name for title
-      let bookName = '';
-      if (initialSource) {
-        bookName = initialSource.replace(/^[📚📄💡🔗]\s*(\[.*?\])?\s*/, '').trim();
-      }
-
-      const defaultTitle = bookName 
-        ? `[통합] ${bookName} 핵심 발췌 및 정리` 
+      const defaultTitle = firstBookTitle 
+        ? `[통합] ${firstBookTitle} 핵심 발췌 및 정리` 
         : `[통합] ${selectedIdeas[0]?.title || '노트'} 외 ${selectedIdeas.length - 1}편`;
       setTitle(defaultTitle);
 

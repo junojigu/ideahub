@@ -11,6 +11,7 @@ import { Idea } from '../types';
 import { formatDate } from '../utils/dateUtils';
 import { renderHighlightedText } from '../utils/highlightUtils';
 import { normalizeMarkdown } from '../utils/markdownUtils';
+import { cleanSourceTitle, extractMainBookTitle, getSourceType } from '../utils/sourceUtils';
 import { ConfirmModal } from './ConfirmModal';
 
 interface EBookReaderModalProps {
@@ -45,27 +46,21 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Clean source string helper
-  const getCleanSource = (s?: string) => {
-    if (!s) return '';
-    return s.replace(/^[📚📄💡🔗]\s*(\[.*?\])?\s*/, '').trim().toLowerCase();
-  };
-
-  const getSourceDisplay = (s?: string) => {
-    if (!s) return '';
-    return s.replace(/^[📚📄💡🔗]\s*(\[.*?\])?\s*/, '').trim();
-  };
-
   // Find all ideas from same source
   const sameSourceIdeas = useMemo(() => {
     if (!idea || !idea.sourceUrl || !allIdeas || allIdeas.length === 0) {
       return idea ? [idea] : [];
     }
 
-    const targetClean = getCleanSource(idea.sourceUrl);
-    if (!targetClean) return [idea];
+    const targetBook = extractMainBookTitle(idea.sourceUrl).toLowerCase();
+    const targetClean = cleanSourceTitle(idea.sourceUrl).toLowerCase();
+    if (!targetBook && !targetClean) return [idea];
 
-    const matched = allIdeas.filter((i) => getCleanSource(i.sourceUrl) === targetClean);
+    const matched = allIdeas.filter((i) => {
+      const b = extractMainBookTitle(i.sourceUrl).toLowerCase();
+      const c = cleanSourceTitle(i.sourceUrl).toLowerCase();
+      return b === targetBook || c === targetClean || (targetBook && (b.includes(targetBook) || targetBook.includes(b)));
+    });
 
     // Sort ideas chronologically by date, then title
     return matched.sort((a, b) => {
@@ -132,10 +127,13 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
 
   const renderSourceBadge = (sourceStr?: string) => {
     if (!sourceStr) return null;
-    const clean = sourceStr.trim();
+    const clean = cleanSourceTitle(sourceStr);
+    if (!clean) return null;
 
-    if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('www.') || clean.startsWith('🔗')) {
-      const href = clean.replace(/^🔗\s*/, '').startsWith('www.') ? `https://${clean}` : clean.replace(/^🔗\s*/, '');
+    const type = getSourceType(sourceStr);
+
+    if (type === 'link') {
+      const href = clean.startsWith('www.') ? `https://${clean}` : clean;
       return (
         <a
           href={href.startsWith('http') ? href : `https://${href}`}
@@ -144,25 +142,25 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 transition-colors"
         >
           <ExternalLink className="w-3.5 h-3.5" />
-          <span>{clean.replace(/^🔗\s*/, '')}</span>
+          <span>{clean}</span>
         </a>
       );
     }
 
-    if (clean.startsWith('📚') || clean.includes('[도서]')) {
+    if (type === 'book') {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-amber-50 text-amber-900 border border-amber-200">
           <Book className="w-3.5 h-3.5 text-amber-600" />
-          <span>{clean.replace(/^📚\s*\[도서\]\s*/, '')}</span>
+          <span>{clean}</span>
         </span>
       );
     }
 
-    if (clean.startsWith('📄') || clean.includes('[일반]')) {
+    if (type === 'general') {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-200">
           <FileText className="w-3.5 h-3.5 text-emerald-600" />
-          <span>{clean.replace(/^📄\s*\[일반\]\s*/, '')}</span>
+          <span>{clean}</span>
         </span>
       );
     }
@@ -170,7 +168,7 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
     return (
       <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-indigo-50 text-indigo-900 border border-indigo-200">
         <Lightbulb className="w-3.5 h-3.5 text-indigo-600" />
-        <span>{clean.replace(/^💡\s*\[기타\]\s*/, '')}</span>
+        <span>{clean}</span>
       </span>
     );
   };
@@ -493,7 +491,7 @@ export const EBookReaderModal: React.FC<EBookReaderModalProps> = ({
                   </div>
 
                   <h1 className="text-xl sm:text-2xl font-black text-amber-950 font-sans tracking-tight">
-                    📚 {getSourceDisplay(idea.sourceUrl) || idea.title}
+                    📚 {extractMainBookTitle(idea.sourceUrl) || idea.title}
                   </h1>
 
                   {/* Table of Contents Quick Jump Pills */}

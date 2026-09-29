@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { Idea } from '../types';
 import { normalizeMarkdown } from '../utils/markdownUtils';
+import { cleanSourceTitle, extractMainBookTitle } from '../utils/sourceUtils';
 
 interface RegisterEditModalProps {
   isOpen: boolean;
@@ -291,9 +292,11 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
   const existingBookSources = Array.from(
     new Set(
       existingIdeas
-        .map((i) => (i.sourceUrl || '').trim())
-        .filter((src) => src.startsWith('📚') || src.includes('[도서]'))
-        .map((src) => src.replace(/^📚\s*\[도서\]\s*/, '').trim())
+        .filter((i) => {
+          const s = (i.sourceUrl || '').trim();
+          return s.includes('[도서]') || s.includes('📚') || s.startsWith('도서:');
+        })
+        .map((i) => extractMainBookTitle(i.sourceUrl))
         .filter(Boolean)
     )
   );
@@ -301,8 +304,7 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
   const existingAllSources = Array.from(
     new Set(
       existingIdeas
-        .map((i) => (i.sourceUrl || '').trim())
-        .map((src) => src.replace(/^[📚📄💡🔗]\s*(\[.*?\])?\s*/, '').trim())
+        .map((i) => cleanSourceTitle(i.sourceUrl))
         .filter(Boolean)
     )
   );
@@ -587,110 +589,116 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
 
             {/* Quick Markdown Formatting Toolbar */}
             {contentTab === 'edit' && (
-              <div className="flex items-center gap-1 overflow-x-auto py-1 px-1.5 bg-white border border-slate-200 rounded-lg text-xs select-none shadow-2xs">
-                <span className="text-[10px] font-bold text-slate-400 pl-0.5 pr-1 shrink-0">빠른 서식:</span>
+              <div className="flex items-center gap-1 overflow-x-auto py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-xl text-xs select-none shadow-2xs">
+                <span className="text-[10px] font-extrabold text-slate-400 pl-0.5 pr-1 shrink-0">서식:</span>
                 
                 <button
                   type="button"
                   onClick={() => insertMarkdownAtCursor('# 1단계 대제목', true, '1단계 대제목')}
-                  className="px-1.5 py-0.5 font-black text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
+                  className="p-1.5 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 flex items-center gap-1 border border-transparent hover:border-slate-200"
                   title="대제목 (H1)"
                 >
-                  H1
+                  <Heading1 className="w-3.5 h-3.5 text-slate-800" />
                 </button>
                 <button
                   type="button"
                   onClick={() => insertMarkdownAtCursor('## 2단계 중제목', true, '2단계 중제목')}
-                  className="px-1.5 py-0.5 font-extrabold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
+                  className="p-1.5 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 flex items-center gap-1 border border-transparent hover:border-slate-200"
                   title="중제목 (H2)"
                 >
-                  H2
+                  <Heading2 className="w-3.5 h-3.5 text-slate-800" />
                 </button>
                 <button
                   type="button"
                   onClick={() => insertMarkdownAtCursor('### 3단계 소제목', true, '3단계 소제목')}
-                  className="px-1.5 py-0.5 font-bold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
+                  className="p-1.5 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 flex items-center gap-1 border border-transparent hover:border-slate-200"
                   title="소제목 (H3)"
                 >
-                  H3
+                  <Heading3 className="w-3.5 h-3.5 text-slate-800" />
                 </button>
 
-                <div className="w-px h-3.5 bg-slate-200 mx-0.5 shrink-0" />
+                <div className="w-px h-3.5 bg-slate-300 mx-0.5 shrink-0" />
 
                 <button
                   type="button"
                   onClick={() => insertMarkdownAtCursor('**강조할 텍스트**', false, '강조할 텍스트')}
-                  className="px-1.5 py-0.5 font-black text-slate-800 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
+                  className="p-1.5 text-slate-800 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 border border-transparent hover:border-slate-200"
                   title="굵게 (Bold)"
                 >
-                  B
+                  <Bold className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
                   onClick={() => insertMarkdownAtCursor('*기울인 텍스트*', false, '기울인 텍스트')}
-                  className="px-1.5 py-0.5 italic font-serif font-bold text-slate-800 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
+                  className="p-1.5 text-slate-800 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 border border-transparent hover:border-slate-200"
                   title="기울임 (Italic)"
                 >
-                  I
+                  <Italic className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
                   onClick={() => insertMarkdownAtCursor('~~취소선 텍스트~~', false, '취소선 텍스트')}
-                  className="px-1.5 py-0.5 line-through font-semibold text-slate-600 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-xs"
+                  className="p-1.5 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 border border-transparent hover:border-slate-200"
                   title="취소선"
                 >
-                  S
+                  <Strikethrough className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
                   onClick={() => insertMarkdownAtCursor('==형광펜 강조 텍스트==', false, '형광펜 강조 텍스트')}
-                  className="px-1.5 py-0.5 bg-amber-100/80 hover:bg-amber-200 text-amber-900 font-bold rounded transition-colors shrink-0 text-[11px] border border-amber-300/60"
-                  title="형광펜 강조"
+                  className="px-2 py-1 bg-amber-100/90 hover:bg-amber-200 text-amber-950 font-bold rounded-lg transition-all shrink-0 text-[11px] border border-amber-300/80 flex items-center gap-1 shadow-2xs"
+                  title="형광펜 강조 (==텍스트==)"
                 >
-                  🖍️ 형광펜
+                  <Highlighter className="w-3.5 h-3.5 text-amber-700" />
+                  <span>형광펜</span>
                 </button>
 
-                <div className="w-px h-3.5 bg-slate-200 mx-0.5 shrink-0" />
+                <div className="w-px h-3.5 bg-slate-300 mx-0.5 shrink-0" />
 
                 <button
                   type="button"
                   onClick={() => insertMarkdownAtCursor('- 목록 항목\n- 다음 항목', true, '목록 항목')}
-                  className="px-1.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
-                  title="불릿 점 목록 (- )"
+                  className="px-2 py-1 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 text-[11px] font-semibold flex items-center gap-1 border border-transparent hover:border-slate-200"
+                  title="글머리 기호 목록 (- )"
                 >
-                  • 목록
+                  <List className="w-3.5 h-3.5" />
+                  <span>목록</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => insertMarkdownAtCursor('1. 첫 번째 순서\n2. 두 번째 순서', true, '첫 번째 순서')}
-                  className="px-1.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
+                  className="px-2 py-1 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 text-[11px] font-semibold flex items-center gap-1 border border-transparent hover:border-slate-200"
                   title="순서 있는 목록 (1. )"
                 >
-                  1. 순서
+                  <ListOrdered className="w-3.5 h-3.5" />
+                  <span>순서</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => insertMarkdownAtCursor('> 중요한 인용구', true, '중요한 인용구')}
-                  className="px-1.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
+                  className="px-2 py-1 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 text-[11px] font-semibold flex items-center gap-1 border border-transparent hover:border-slate-200"
                   title="인용구 (> )"
                 >
-                  ❝ 인용
+                  <Quote className="w-3.5 h-3.5" />
+                  <span>인용</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => insertMarkdownAtCursor('```\n코드 입력\n```', true, '코드 입력')}
-                  className="px-1.5 py-0.5 font-mono text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
+                  className="px-2 py-1 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 text-[11px] font-semibold flex items-center gap-1 border border-transparent hover:border-slate-200"
                   title="코드 블록"
                 >
-                  `코드`
+                  <Code className="w-3.5 h-3.5" />
+                  <span>코드</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => insertMarkdownAtCursor('[링크 이름](https://)', false, '링크 이름')}
-                  className="px-1.5 py-0.5 font-semibold text-slate-700 hover:bg-slate-100 hover:text-blue-600 rounded transition-colors shrink-0 text-[11px]"
+                  className="px-2 py-1 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 text-[11px] font-semibold flex items-center gap-1 border border-transparent hover:border-slate-200"
                   title="하이퍼링크"
                 >
-                  🔗 링크
+                  <LinkIcon className="w-3.5 h-3.5" />
+                  <span>링크</span>
                 </button>
               </div>
             )}
