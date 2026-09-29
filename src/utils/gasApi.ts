@@ -22,24 +22,21 @@ export async function requestGasApi(payload: GasProxyPayload): Promise<any> {
     });
 
     if (proxyRes.ok) {
-      const data = await proxyRes.json();
-      return data;
+      const contentType = proxyRes.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await proxyRes.json();
+        return data;
+      }
     }
   } catch (proxyError) {
-    // Proxy failed or not available (e.g. running on Vercel without proxy)
     console.info('Proxy not available, falling back to direct GAS communication:', proxyError);
   }
 
   // 2. Direct Fallback to Google Apps Script Web App
   if (action === 'getIdeasAndAnalysis') {
-    // Direct GET to GAS with cache-buster
+    // Simple GET without custom headers so browser follows redirect without CORS preflight
     const directUrl = `${targetUrl}${targetUrl.includes('?') ? '&' : '?'}action=getIdeasAndAnalysis&t=${Date.now()}`;
-    const directRes = await fetch(directUrl, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
+    const directRes = await fetch(directUrl);
 
     if (!directRes.ok) {
       throw new Error(`Direct GAS request failed with status: ${directRes.status}`);

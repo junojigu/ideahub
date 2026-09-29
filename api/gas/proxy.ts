@@ -9,21 +9,29 @@ export default async function handler(req: any, res: any) {
   );
 
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return res.status(200).end();
   }
 
   const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyTP0hfXvAKpmC1USIytbGBO3Mrs1KK_36aeIaDi6Mo5R_nwGmo4Ln_XknsyEWjJxQz/exec';
 
   try {
-    const { gasUrl, action, ...params } = req.body || {};
-    const targetUrl = gasUrl || DEFAULT_GAS_URL;
+    let payload = req.method === 'GET' ? req.query : req.body;
+    if (typeof payload === 'string') {
+      try {
+        payload = JSON.parse(payload);
+      } catch {
+        payload = {};
+      }
+    }
+    payload = payload || {};
+
+    const targetUrl = payload.gasUrl || DEFAULT_GAS_URL;
+    const action = payload.action || (req.method === 'GET' ? 'getIdeasAndAnalysis' : '');
 
     if (action === 'getIdeasAndAnalysis') {
       const fetchUrl = `${targetUrl}?action=getIdeasAndAnalysis&t=${Date.now()}`;
       const response = await fetch(fetchUrl, {
         method: 'GET',
-        headers: { Accept: 'application/json' },
       });
       if (!response.ok) {
         throw new Error(`GAS request failed with status ${response.status}`);
@@ -32,10 +40,11 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ status: 'SUCCESS', ...data });
     }
 
+    const { gasUrl: _g, ...params } = payload;
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, ...params }),
+      body: JSON.stringify(params),
     });
 
     if (!response.ok) {
