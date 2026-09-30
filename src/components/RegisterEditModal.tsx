@@ -37,6 +37,7 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
 
   // Content Textarea Ref & Selection Memory for Cursor-based Insertion
   const contentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const savedSelectionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
   const [savedSelection, setSavedSelection] = useState<{ start: number; end: number } | null>(null);
 
   // Dragging window position states
@@ -166,17 +167,17 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
   // Record cursor selection whenever user interacts with textarea
   const updateCursorSelection = () => {
     if (contentTextareaRef.current) {
-      setSavedSelection({
-        start: contentTextareaRef.current.selectionStart,
-        end: contentTextareaRef.current.selectionEnd,
-      });
+      const start = contentTextareaRef.current.selectionStart;
+      const end = contentTextareaRef.current.selectionEnd;
+      savedSelectionRef.current = { start, end };
+      setSavedSelection({ start, end });
     }
   };
 
   /**
    * Inserts markdown snippet directly at current cursor/selection position.
-   * If text is selected, wraps or replaces placeholder with selected text.
-   * If isBlock is true, ensures clean line breaks before and after.
+   * If text is selected (blocked), wraps or replaces placeholder with selected text
+   * and positions cursor immediately after the applied text without jumping to the bottom.
    */
   const insertMarkdownAtCursor = (
     snippet: string,
@@ -184,8 +185,18 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
     placeholder: string = ''
   ) => {
     const textarea = contentTextareaRef.current;
-    let start = savedSelection?.start ?? (textarea ? textarea.selectionStart : content.length);
-    let end = savedSelection?.end ?? (textarea ? textarea.selectionEnd : content.length);
+    if (!textarea) return;
+
+    const savedScrollTop = textarea.scrollTop;
+
+    // Retrieve active selection, preferring live textarea selection if available
+    let start = textarea.selectionStart;
+    let end = textarea.selectionEnd;
+
+    if (start === 0 && end === 0 && savedSelectionRef.current.end > 0) {
+      start = savedSelectionRef.current.start;
+      end = savedSelectionRef.current.end;
+    }
 
     if (start < 0 || start > content.length) start = content.length;
     if (end < 0 || end > content.length) end = content.length;
@@ -198,10 +209,22 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
     const selectedText = content.substring(start, end);
     let inserted = snippet;
 
-    // If there is selected text, intelligently wrap or replace placeholder
+    // If user has selected (blocked) text, intelligently wrap or replace placeholder
     if (selectedText) {
       if (placeholder && inserted.includes(placeholder)) {
         inserted = inserted.replace(placeholder, selectedText);
+      } else if (snippet.startsWith('- ')) {
+        // Multi-line bullet list
+        inserted = selectedText
+          .split('\n')
+          .map((line) => (line.startsWith('- ') ? line : `- ${line}`))
+          .join('\n');
+      } else if (snippet.startsWith('1. ')) {
+        // Multi-line numbered list
+        inserted = selectedText
+          .split('\n')
+          .map((line, idx) => (line.match(/^\d+\.\s/) ? line : `${idx + 1}. ${line}`))
+          .join('\n');
       }
     }
 
@@ -221,18 +244,56 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
 
     const fullInsertion = prefix + inserted + suffix;
     const newContent = content.substring(0, start) + fullInsertion + content.substring(end);
-    setContent(newContent);
 
-    const newCursorPos = start + prefix.length + inserted.length;
-    setSavedSelection({ start: newCursorPos, end: newCursorPos });
+    // Calculate exact cursor location where markdown was applied
+    let targetCursorStart = 0;
+    let targetCursorEnd = 0;
 
-    // Refocus and place cursor
-    setTimeout(() => {
-      if (textarea) {
-        textarea.focus();
-        textarea.setSelectionRange(newCursorPos, newCursorPos);
+    if (selectedText) {
+      // If user had blocked text, place cursor right after the applied markdown
+      const appliedEndPos = start + prefix.length + inserted.length;
+      targetCursorStart = appliedEndPos;
+      targetCursorEnd = appliedEndPos;
+    } else {
+      // If no text was selected, select the placeholder text if present
+      if (placeholder && inserted.includes(placeholder)) {
+        const placeholderIdx = inserted.indexOf(placeholder);
+        targetCursorStart = start + prefix.length + placeholderIdx;
+        targetCursorEnd = targetCursorStart + placeholder.length;
+      } else {
+        const appliedEndPos = start + prefix.length + inserted.length;
+        targetCursorStart = appliedEndPos;
+        targetCursorEnd = appliedEndPos;
       }
-    }, 50);
+    }
+
+    // 1. Immediately apply to textarea DOM to prevent cursor jump to bottom
+    textarea.value = newContent;
+    textarea.focus();
+    textarea.setSelectionRange(targetCursorStart, targetCursorEnd);
+    textarea.scrollTop = savedScrollTop;
+
+    // 2. Update React state
+    setContent(newContent);
+    savedSelectionRef.current = { start: targetCursorStart, end: targetCursorEnd };
+    setSavedSelection({ start: targetCursorStart, end: targetCursorEnd });
+
+    // 3. Re-assert cursor position and scroll top on next frames after React reconciliation
+    requestAnimationFrame(() => {
+      if (contentTextareaRef.current) {
+        contentTextareaRef.current.focus();
+        contentTextareaRef.current.setSelectionRange(targetCursorStart, targetCursorEnd);
+        contentTextareaRef.current.scrollTop = savedScrollTop;
+      }
+    });
+
+    setTimeout(() => {
+      if (contentTextareaRef.current) {
+        contentTextareaRef.current.focus();
+        contentTextareaRef.current.setSelectionRange(targetCursorStart, targetCursorEnd);
+        contentTextareaRef.current.scrollTop = savedScrollTop;
+      }
+    }, 25);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -594,24 +655,27 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
                 
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertMarkdownAtCursor('# 1단계 대제목', true, '1단계 대제목')}
-                  className="p-1.5 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 flex items-center gap-1 border border-transparent hover:border-slate-200"
+                  className="p-1.5 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 flex items-center gap-1 border border-transparent hover:border-slate-200 cursor-pointer"
                   title="대제목 (H1)"
                 >
                   <Heading1 className="w-3.5 h-3.5 text-slate-800" />
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertMarkdownAtCursor('## 2단계 중제목', true, '2단계 중제목')}
-                  className="p-1.5 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 flex items-center gap-1 border border-transparent hover:border-slate-200"
+                  className="p-1.5 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 flex items-center gap-1 border border-transparent hover:border-slate-200 cursor-pointer"
                   title="중제목 (H2)"
                 >
                   <Heading2 className="w-3.5 h-3.5 text-slate-800" />
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertMarkdownAtCursor('### 3단계 소제목', true, '3단계 소제목')}
-                  className="p-1.5 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 flex items-center gap-1 border border-transparent hover:border-slate-200"
+                  className="p-1.5 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 flex items-center gap-1 border border-transparent hover:border-slate-200 cursor-pointer"
                   title="소제목 (H3)"
                 >
                   <Heading3 className="w-3.5 h-3.5 text-slate-800" />
@@ -621,32 +685,36 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
 
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertMarkdownAtCursor('**강조할 텍스트**', false, '강조할 텍스트')}
-                  className="p-1.5 text-slate-800 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 border border-transparent hover:border-slate-200"
+                  className="p-1.5 text-slate-800 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 border border-transparent hover:border-slate-200 cursor-pointer"
                   title="굵게 (Bold)"
                 >
                   <Bold className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertMarkdownAtCursor('*기울인 텍스트*', false, '기울인 텍스트')}
-                  className="p-1.5 text-slate-800 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 border border-transparent hover:border-slate-200"
+                  className="p-1.5 text-slate-800 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 border border-transparent hover:border-slate-200 cursor-pointer"
                   title="기울임 (Italic)"
                 >
                   <Italic className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertMarkdownAtCursor('~~취소선 텍스트~~', false, '취소선 텍스트')}
-                  className="p-1.5 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 border border-transparent hover:border-slate-200"
+                  className="p-1.5 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 border border-transparent hover:border-slate-200 cursor-pointer"
                   title="취소선"
                 >
                   <Strikethrough className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertMarkdownAtCursor('==형광펜 강조 텍스트==', false, '형광펜 강조 텍스트')}
-                  className="px-2 py-1 bg-amber-100/90 hover:bg-amber-200 text-amber-950 font-bold rounded-lg transition-all shrink-0 text-[11px] border border-amber-300/80 flex items-center gap-1 shadow-2xs"
+                  className="px-2 py-1 bg-amber-100/90 hover:bg-amber-200 text-amber-950 font-bold rounded-lg transition-all shrink-0 text-[11px] border border-amber-300/80 flex items-center gap-1 shadow-2xs cursor-pointer"
                   title="형광펜 강조 (==텍스트==)"
                 >
                   <Highlighter className="w-3.5 h-3.5 text-amber-700" />
@@ -657,8 +725,9 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
 
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertMarkdownAtCursor('- 목록 항목\n- 다음 항목', true, '목록 항목')}
-                  className="px-2 py-1 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 text-[11px] font-semibold flex items-center gap-1 border border-transparent hover:border-slate-200"
+                  className="px-2 py-1 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 text-[11px] font-semibold flex items-center gap-1 border border-transparent hover:border-slate-200 cursor-pointer"
                   title="글머리 기호 목록 (- )"
                 >
                   <List className="w-3.5 h-3.5" />
@@ -666,8 +735,9 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertMarkdownAtCursor('1. 첫 번째 순서\n2. 두 번째 순서', true, '첫 번째 순서')}
-                  className="px-2 py-1 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 text-[11px] font-semibold flex items-center gap-1 border border-transparent hover:border-slate-200"
+                  className="px-2 py-1 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 text-[11px] font-semibold flex items-center gap-1 border border-transparent hover:border-slate-200 cursor-pointer"
                   title="순서 있는 목록 (1. )"
                 >
                   <ListOrdered className="w-3.5 h-3.5" />
@@ -675,8 +745,9 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertMarkdownAtCursor('> 중요한 인용구', true, '중요한 인용구')}
-                  className="px-2 py-1 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 text-[11px] font-semibold flex items-center gap-1 border border-transparent hover:border-slate-200"
+                  className="px-2 py-1 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 text-[11px] font-semibold flex items-center gap-1 border border-transparent hover:border-slate-200 cursor-pointer"
                   title="인용구 (> )"
                 >
                   <Quote className="w-3.5 h-3.5" />
@@ -684,8 +755,9 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertMarkdownAtCursor('```\n코드 입력\n```', true, '코드 입력')}
-                  className="px-2 py-1 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 text-[11px] font-semibold flex items-center gap-1 border border-transparent hover:border-slate-200"
+                  className="px-2 py-1 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 text-[11px] font-semibold flex items-center gap-1 border border-transparent hover:border-slate-200 cursor-pointer"
                   title="코드 블록"
                 >
                   <Code className="w-3.5 h-3.5" />
@@ -693,8 +765,9 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertMarkdownAtCursor('[링크 이름](https://)', false, '링크 이름')}
-                  className="px-2 py-1 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 text-[11px] font-semibold flex items-center gap-1 border border-transparent hover:border-slate-200"
+                  className="px-2 py-1 text-slate-700 hover:bg-white hover:text-blue-600 hover:shadow-2xs rounded-lg transition-all shrink-0 text-[11px] font-semibold flex items-center gap-1 border border-transparent hover:border-slate-200 cursor-pointer"
                   title="하이퍼링크"
                 >
                   <LinkIcon className="w-3.5 h-3.5" />
@@ -714,7 +787,7 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
                 onSelect={updateCursorSelection}
                 onKeyUp={updateCursorSelection}
                 onClick={updateCursorSelection}
-                onBlur={updateCursorSelection}
+                onMouseUp={updateCursorSelection}
                 placeholder="지식 노트 상세 내용 및 아이디어를 기술하세요..."
                 className="w-full px-3 py-2.5 min-h-[220px] sm:min-h-[280px] text-sm sm:text-base border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 bg-white leading-relaxed resize-y text-slate-800 font-sans"
               />
