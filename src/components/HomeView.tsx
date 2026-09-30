@@ -55,21 +55,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] bg-gradient-to-tr from-blue-100/60 via-indigo-100/40 to-purple-100/30 rounded-full blur-3xl -z-10 pointer-events-none"></div>
 
       {/* Sleek Hero Display Header */}
-      <div className="mb-6 space-y-2">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50/80 border border-blue-200/60 text-blue-700 text-xs font-bold rounded-full mb-2 shadow-2xs">
-          <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-          <span>지능형 지식창고 & 아이디어 파이프라인</span>
-        </div>
-
+      <div className="mb-6">
         <h1 className="text-5xl sm:text-6xl md:text-7xl font-black tracking-tight text-slate-900 select-none">
           <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-900 bg-clip-text text-transparent">
             IdeaHub
           </span>
         </h1>
-
-        <p className="text-slate-500 text-sm sm:text-base font-medium max-w-lg mx-auto leading-relaxed">
-          흩어진 영감과 학습 지식을 검색하고, 연관 태그 네트워크로 확장하세요
-        </p>
       </div>
 
       {/* Main Big Search Bar */}
