@@ -52,6 +52,7 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
   }, [isOpen]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (typeof window !== 'undefined' && window.innerWidth < 640) return;
     if (e.button !== 0) return;
     setIsDragging(true);
     setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
@@ -381,32 +382,34 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 select-none"
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 select-none"
       onClick={(e) => e.stopPropagation()}
     >
       <div
-        style={{
-          transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
-        }}
-        className="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-slate-200 flex flex-col max-h-[90vh] overflow-hidden transition-shadow"
+        style={
+          typeof window !== 'undefined' && window.innerWidth >= 640 && (position.x !== 0 || position.y !== 0)
+            ? { transform: `translate3d(${position.x}px, ${position.y}px, 0)` }
+            : undefined
+        }
+        className="bg-white rounded-2xl w-full max-w-[calc(100vw-16px)] sm:max-w-xl shadow-2xl border border-slate-200 flex flex-col h-[95dvh] max-h-[95dvh] sm:h-auto sm:max-h-[90vh] overflow-hidden transition-all"
         onClick={(e) => e.stopPropagation()}
       >
         
-        {/* Banner Header (Draggable) */}
+        {/* Banner Header (Draggable on desktop) */}
         <div
           onMouseDown={handleMouseDown}
-          className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 text-white px-4 py-3 sm:px-5 sm:py-3.5 relative overflow-hidden shrink-0 flex items-center justify-between cursor-grab active:cursor-grabbing select-none"
+          className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 text-white px-3.5 py-2.5 sm:px-5 sm:py-3.5 relative overflow-hidden shrink-0 flex items-center justify-between sm:cursor-grab sm:active:cursor-grabbing select-none"
         >
-          <div className="relative z-10 flex items-center gap-2.5">
+          <div className="relative z-10 flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/20 text-white flex items-center justify-center font-bold text-base shadow-inner shrink-0">
               ✨
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-extrabold text-base sm:text-lg text-white font-sans">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-extrabold text-base sm:text-lg text-white font-sans truncate">
                   {editingIdea ? '지식 노트 수정' : '새 지식 노트 등록'}
                 </h3>
-                <span className="text-[10px] bg-white/15 text-indigo-200 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                <span className="hidden sm:inline-flex text-[10px] bg-white/15 text-indigo-200 px-2 py-0.5 rounded-full font-medium items-center gap-1">
                   <Move className="w-3 h-3" />
                   드래그 이동 가능
                 </span>
@@ -416,15 +419,18 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="relative z-10 w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all cursor-pointer font-bold text-base"
-            title="닫기"
+            className="relative z-10 w-9 h-9 sm:w-8 sm:h-8 rounded-xl bg-white/15 hover:bg-white/25 active:bg-white/35 text-white flex items-center justify-center transition-all cursor-pointer font-bold shrink-0 ml-2 shadow-xs"
+            title="닫기 (ESC)"
+            aria-label="닫기"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Form Body - Compact & Minimal Padding */}
-        <form onSubmit={handleSubmit} className="p-4 sm:p-5 flex flex-col gap-3 overflow-y-auto font-sans">
+        {/* Form Body - Scrollable with fixed bottom action bar */}
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden font-sans">
+          
+          <div className="p-3 sm:p-5 flex-1 overflow-y-auto flex flex-col gap-3 max-w-full">
           
           {/* AI Auto Tag Banner */}
           <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200/80 p-2.5 rounded-xl flex items-center justify-between gap-2">
@@ -887,20 +893,22 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
             )}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-2 pt-1">
+          </div>
+
+          {/* Fixed Bottom Action Buttons Bar */}
+          <div className="p-3 sm:px-5 sm:py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs sm:text-sm border border-slate-200 transition-colors cursor-pointer"
             >
               취소
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-lg shadow-sm transition-all cursor-pointer flex items-center gap-1 active:scale-98"
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-98"
             >
-              {editingIdea ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+              {editingIdea ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
               <span>{editingIdea ? '수정 완료' : '저장'}</span>
             </button>
           </div>
@@ -912,23 +920,24 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
       {/* Markdown Guide Popup Modal */}
       {isMdGuideOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[110] flex items-center justify-center p-3 sm:p-5 font-sans"
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[110] flex items-center justify-center p-2 sm:p-5 font-sans"
           onClick={() => setIsMdGuideOpen(false)}
         >
           <div
-            className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh] transition-all"
+            className="bg-white rounded-2xl w-full max-w-[calc(100vw-16px)] sm:max-w-lg shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[90dvh] max-h-[90dvh] sm:h-auto sm:max-h-[85vh] transition-all"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2">
-                <Code className="w-4 h-4 text-blue-400" />
-                <h3 className="text-sm font-extrabold tracking-tight">마크다운(Markdown) 작성 가이드</h3>
+            <div className="px-4 sm:px-5 py-3 sm:py-3.5 bg-slate-900 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <Code className="w-4 h-4 text-blue-400 shrink-0" />
+                <h3 className="text-xs sm:text-sm font-extrabold tracking-tight truncate">마크다운(Markdown) 작성 가이드</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsMdGuideOpen(false)}
-                className="text-slate-400 hover:text-white transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all cursor-pointer shrink-0 ml-2"
+                title="닫기"
               >
                 <X className="w-4 h-4" />
               </button>
