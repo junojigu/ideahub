@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   Sparkles, RotateCw, Filter, ChevronDown, Trash2, ArrowUpDown, 
   Star, Eye, PenSquare, ArrowRight, ExternalLink, Book, FileText, Lightbulb,
-  Download, Network, CheckSquare, Square, Plus, Layers, X
+  Download, Network, CheckSquare, Square, Plus, Layers, X, Youtube, Play, Camera
 } from 'lucide-react';
 import { Idea } from '../types';
 import { formatDate, parseTimestamp } from '../utils/dateUtils';
@@ -14,9 +14,15 @@ import {
   SourceCategory, 
   SOURCE_CATEGORIES, 
   getSourceCategory, 
-  parseSourceCategorySearch 
+  parseSourceCategorySearch,
+  isPhotoIdea,
+  PHOTO_PRESET_TAGS,
+  extractYouTubeVideoId,
+  getIdeaYouTubeInfo,
+  isYouTubeUrl
 } from '../utils/sourceUtils';
 import { ConfirmModal } from './ConfirmModal';
+import { YouTubePlayerModal } from './YouTubePlayerModal';
 
 interface FeedViewProps {
   ideas: Idea[];
@@ -73,6 +79,17 @@ export const FeedView: React.FC<FeedViewProps> = ({
   const [tagSortOrder, setTagSortOrder] = useState<'count' | 'alphabetical'>('count');
   const [hoveredTag, setHoveredTag] = useState<string | null>(null);
 
+  // Photography special filter state
+  const [isPhotoFilterActive, setIsPhotoFilterActive] = useState(false);
+
+  // Active YouTube video player modal state
+  const [activeYouTubeVideo, setActiveYouTubeVideo] = useState<{
+    videoId: string;
+    title: string;
+    videoUrl?: string;
+    idea?: Idea | null;
+  } | null>(null);
+
   // Compute Book Shelf / Source statistics sorted by: 도서 -> 문서 -> 메모 -> 웹링크
   const sourceStats = useMemo(() => {
     const map = new Map<
@@ -82,6 +99,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
         count: number;
         displayName: string;
         category: 'book' | 'document' | 'memo' | 'link';
+        isYouTube: boolean;
       }
     >();
 
@@ -93,6 +111,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
 
       const mainTitle = extractMainBookTitle(src);
       const category = getSourceCategory(src); // 'book' | 'document' | 'memo' | 'link'
+      const isYouTube = isYouTubeUrl(src);
 
       // Group key: for books, group by main title so p.1, p.2 are grouped together
       const key = category === 'book' ? mainTitle.toLowerCase() : clean.toLowerCase();
@@ -106,6 +125,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
           count: 1,
           displayName: category === 'book' ? mainTitle : clean,
           category,
+          isYouTube,
         });
       }
     });
@@ -170,6 +190,11 @@ export const FeedView: React.FC<FeedViewProps> = ({
 
   // Filter ideas
   const filteredIdeas = ideas.filter((idea) => {
+    // 0. Photography special filter
+    if (isPhotoFilterActive && !isPhotoIdea(idea)) {
+      return false;
+    }
+
     // 1. Source Category filter (웹링크, 도서, 문서, 메모)
     if (activeSourceCategory !== 'all') {
       const ideaCategory = getSourceCategory(idea.sourceUrl);
@@ -340,17 +365,48 @@ export const FeedView: React.FC<FeedViewProps> = ({
     onSelectSubTags([]);
     setSelectedSource(null);
     setSelectedSourceCategory('all');
+    setIsPhotoFilterActive(false);
     setCurrentPage(1);
   };
 
-  // Helper for source badges
-  const renderSourceBadge = (sourceStr?: string) => {
+  // Helper for source badges (special support for YouTube videos)
+  const renderSourceBadge = (idea: Idea) => {
+    const sourceStr = idea.sourceUrl;
     if (!sourceStr) return null;
     const clean = cleanSourceTitle(sourceStr);
     if (!clean) return null;
 
     const mainTitle = extractMainBookTitle(sourceStr);
     const type = getSourceType(sourceStr);
+
+    // YouTube Video Link: show dedicated red badge with play button
+    const ytVideoId = extractYouTubeVideoId(sourceStr);
+    if (ytVideoId) {
+      return (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setActiveYouTubeVideo({
+              videoId: ytVideoId,
+              title: idea.title,
+              videoUrl: sourceStr.startsWith('http') ? sourceStr : `https://youtu.be/${ytVideoId}`,
+              idea,
+            });
+          }}
+          className="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-bold rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-all cursor-pointer shrink-0 shadow-2xs group/yt"
+          title="클릭하여 유튜브 영상 바로 시청"
+        >
+          <div className="w-3.5 h-3.5 rounded bg-red-600 flex items-center justify-center text-white shrink-0 group-hover/yt:scale-110 transition-transform">
+            <Play className="w-2 h-2 fill-white ml-0.5" />
+          </div>
+          <span className="font-extrabold text-red-600">YouTube</span>
+          <span className="max-w-[120px] truncate text-red-950 font-medium">
+            {clean.includes('youtu') ? '영상 시청' : clean}
+          </span>
+        </button>
+      );
+    }
 
     if (type === 'link') {
       const href = clean.startsWith('www.') ? `https://${clean}` : clean;
@@ -462,6 +518,27 @@ export const FeedView: React.FC<FeedViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Photography Special Filter Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsPhotoFilterActive(!isPhotoFilterActive);
+                setCurrentPage(1);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                isPhotoFilterActive
+                  ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-200'
+                  : 'bg-white hover:bg-amber-50/80 text-slate-700 border border-slate-200 hover:border-amber-300'
+              }`}
+              title="사진, 카메라, 렌즈, 촬영팁 관련 지식만 모아보기"
+            >
+              <Camera className={`w-3.5 h-3.5 ${isPhotoFilterActive ? 'text-white' : 'text-amber-600'}`} />
+              <span>📷 사진·촬영 모아보기</span>
+              {isPhotoFilterActive && (
+                <span className="w-1.5 h-1.5 rounded-full bg-white ml-0.5 animate-pulse" />
+              )}
+            </button>
+
             {checkedIds.length > 0 && (
               <div className="flex items-center gap-2">
                 {onOpenMergeModal && (
@@ -716,7 +793,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
                           ))}
                         </div>
 
-                        {renderSourceBadge(idea.sourceUrl)}
+                        {renderSourceBadge(idea)}
                       </div>
 
                       {/* Action buttons */}
@@ -748,41 +825,90 @@ export const FeedView: React.FC<FeedViewProps> = ({
                       </span>
                     </div>
 
-                    {/* Content snippet */}
-                    <p
-                      onClick={() => onOpenPreviewModal(idea.id)}
-                      className="text-xs sm:text-sm text-slate-600 leading-relaxed line-clamp-3 cursor-pointer hover:text-slate-900 transition-colors font-normal"
-                    >
-                      {renderHighlightedText(idea.content || '본문 내용이 비어있습니다.', searchQuery)}
-                    </p>
-
-                    {/* Tags */}
-                    <div className="flex flex-wrap gap-1.5 mt-1">
-                      {(idea.tags || []).map((t, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => {
-                            if (selectedTags.includes(t)) {
-                              onSelectTags(selectedTags.filter((st) => st !== t));
-                            } else {
-                              onSelectTags([t]);
-                            }
-                          }}
-                          onMouseEnter={() => setHoveredTag(t)}
-                          onMouseLeave={() => setHoveredTag(null)}
-                          className={`text-xs px-2.5 py-0.5 rounded-full font-medium transition-all cursor-pointer ${
-                            hoveredTag === t
-                              ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-200'
-                              : selectedTags.includes(t)
-                                ? 'bg-blue-600 text-white font-bold'
-                                : idx === 0
-                                  ? 'bg-blue-50 text-blue-700 font-semibold border border-blue-100 hover:bg-blue-100'
-                                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                          }`}
+                    {/* Content snippet & YouTube Thumbnail preview */}
+                    <div className="flex flex-col sm:flex-row items-start justify-between gap-3.5 my-1">
+                      <div className="flex-1 min-w-0 space-y-2">
+                        {/* Content snippet */}
+                        <p
+                          onClick={() => onOpenPreviewModal(idea.id)}
+                          className="text-xs sm:text-sm text-slate-600 leading-relaxed line-clamp-3 cursor-pointer hover:text-slate-900 transition-colors font-normal"
                         >
-                          #{t}
-                        </button>
-                      ))}
+                          {renderHighlightedText(idea.content || '본문 내용이 비어있습니다.', searchQuery)}
+                        </p>
+
+                        {/* Tags */}
+                        <div className="flex flex-wrap gap-1.5 pt-0.5">
+                          {(idea.tags || []).map((t, idx) => {
+                            const isPhotoTag = PHOTO_PRESET_TAGS.includes(t) || ['사진', '카메라', '렌즈', '촬영'].some((k) => t.includes(k));
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => {
+                                  if (selectedTags.includes(t)) {
+                                    onSelectTags(selectedTags.filter((st) => st !== t));
+                                  } else {
+                                    onSelectTags([t]);
+                                  }
+                                }}
+                                onMouseEnter={() => setHoveredTag(t)}
+                                onMouseLeave={() => setHoveredTag(null)}
+                                className={`text-xs px-2.5 py-0.5 rounded-full font-medium transition-all cursor-pointer flex items-center gap-1 ${
+                                  hoveredTag === t
+                                    ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-200'
+                                    : selectedTags.includes(t)
+                                      ? 'bg-blue-600 text-white font-bold'
+                                      : isPhotoTag
+                                        ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-semibold'
+                                        : idx === 0
+                                          ? 'bg-blue-50 text-blue-700 font-semibold border border-blue-100 hover:bg-blue-100'
+                                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                {isPhotoTag && <span className="text-[10px]">📷</span>}
+                                <span>#{t}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* YouTube Thumbnail preview (right side) */}
+                      {(() => {
+                        const youTubeInfo = getIdeaYouTubeInfo(idea);
+                        if (!youTubeInfo) return null;
+                        return (
+                          <div
+                            onClick={() =>
+                              setActiveYouTubeVideo({
+                                videoId: youTubeInfo.videoId,
+                                title: idea.title,
+                                videoUrl: youTubeInfo.videoUrl,
+                                idea,
+                              })
+                            }
+                            className="group/yt relative w-full sm:w-36 md:w-44 aspect-video rounded-xl overflow-hidden shadow-2xs border border-slate-200 hover:border-red-400 cursor-pointer shrink-0 transition-all hover:shadow-md bg-slate-900"
+                            title="클릭하여 유튜브 영상 바로 시청"
+                          >
+                            <img
+                              src={youTubeInfo.thumbnailUrl}
+                              alt={idea.title}
+                              className="w-full h-full object-cover group-hover/yt:scale-105 transition-transform duration-300"
+                              loading="lazy"
+                            />
+                            {/* Dark overlay & Play button */}
+                            <div className="absolute inset-0 bg-black/25 group-hover/yt:bg-black/10 flex items-center justify-center transition-colors">
+                              <div className="w-9 h-6.5 rounded-lg bg-red-600/90 group-hover/yt:bg-red-600 group-hover/yt:scale-110 flex items-center justify-center text-white shadow-md transition-all">
+                                <Play className="w-3.5 h-3.5 fill-white ml-0.5" />
+                              </div>
+                            </div>
+                            {/* YouTube logo badge */}
+                            <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/80 text-[10px] text-white font-mono font-bold flex items-center gap-1 shadow-xs">
+                              <Youtube className="w-3 h-3 text-red-500 fill-red-500" />
+                              <span>YouTube</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                   </div>
@@ -901,7 +1027,9 @@ export const FeedView: React.FC<FeedViewProps> = ({
                       : '🔗 웹링크';
 
                   const formattedName =
-                    src.category === 'book' && !src.displayName.startsWith('[도서]')
+                    src.isYouTube && !src.displayName.startsWith('[YouTube]')
+                      ? `[YouTube] ${src.displayName}`
+                      : src.category === 'book' && !src.displayName.startsWith('[도서]')
                       ? `[도서] ${src.displayName}`
                       : src.category === 'document' && !src.displayName.startsWith('[문서]')
                       ? `[문서] ${src.displayName}`
@@ -930,7 +1058,17 @@ export const FeedView: React.FC<FeedViewProps> = ({
                       >
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                           <span className="shrink-0">
-                            {src.category === 'book' ? '📚' : src.category === 'document' ? '📄' : src.category === 'memo' ? '💡' : '🔗'}
+                            {src.isYouTube ? (
+                              <Youtube className="w-3.5 h-3.5 text-red-600 inline" />
+                            ) : src.category === 'book' ? (
+                              '📚'
+                            ) : src.category === 'document' ? (
+                              '📄'
+                            ) : src.category === 'memo' ? (
+                              '💡'
+                            ) : (
+                              '🔗'
+                            )}
                           </span>
                           <span className="truncate">{formattedName}</span>
                         </div>
@@ -1176,6 +1314,16 @@ export const FeedView: React.FC<FeedViewProps> = ({
           setDeleteTarget(null);
         }}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <YouTubePlayerModal
+        isOpen={activeYouTubeVideo !== null}
+        onClose={() => setActiveYouTubeVideo(null)}
+        videoId={activeYouTubeVideo?.videoId || ''}
+        title={activeYouTubeVideo?.title || ''}
+        videoUrl={activeYouTubeVideo?.videoUrl}
+        idea={activeYouTubeVideo?.idea}
+        onOpenFullNote={onOpenPreviewModal}
       />
 
     </div>

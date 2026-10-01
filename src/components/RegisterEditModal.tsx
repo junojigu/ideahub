@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Star, Link as LinkIcon, FileText, X, Plus, Check, Loader2, Move, HelpCircle, Copy, Code, Bold, Italic, Strikethrough, Highlighter, List, ListOrdered, Quote, Heading1, Heading2, Heading3, Eye, Edit3 } from 'lucide-react';
+import { Sparkles, Star, Link as LinkIcon, FileText, X, Plus, Check, Loader2, Move, HelpCircle, Copy, Code, Bold, Italic, Strikethrough, Highlighter, List, ListOrdered, Quote, Heading1, Heading2, Heading3, Eye, Edit3, Camera, Youtube } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { Idea } from '../types';
 import { normalizeMarkdown } from '../utils/markdownUtils';
-import { cleanSourceTitle, extractMainBookTitle } from '../utils/sourceUtils';
+import { cleanSourceTitle, extractMainBookTitle, PHOTO_PRESET_TAGS, extractYouTubeVideoId, getYouTubeThumbnailUrl } from '../utils/sourceUtils';
 
 interface RegisterEditModalProps {
   isOpen: boolean;
@@ -24,7 +24,7 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
 }) => {
   const [title, setTitle] = useState('');
   const [tagsStr, setTagsStr] = useState('');
-  const [sourceType, setSourceType] = useState<'link' | 'book' | 'general' | 'other'>('link');
+  const [sourceType, setSourceType] = useState<'link' | 'youtube' | 'book' | 'general' | 'other'>('link');
   const [sourceUrl, setSourceUrl] = useState('');
   const [content, setContent] = useState('');
   const [importance, setImportance] = useState(1);
@@ -92,12 +92,15 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
       if (src.startsWith('📚') || src.includes('[도서]')) {
         setSourceType('book');
         setSourceUrl(src.replace(/^📚\s*\[도서\]\s*/, ''));
+      } else if (extractYouTubeVideoId(src)) {
+        setSourceType('youtube');
+        setSourceUrl(src.replace(/^🔗\s*/, ''));
       } else if (src.startsWith('📄') || src.includes('[일반]')) {
         setSourceType('general');
         setSourceUrl(src.replace(/^📄\s*\[일반\]\s*/, ''));
-      } else if (src.startsWith('💡') || src.includes('[기타]')) {
+      } else if (src.startsWith('💡') || src.includes('[기타]') || src.includes('[메모]')) {
         setSourceType('other');
-        setSourceUrl(src.replace(/^💡\s*\[기타\]\s*/, ''));
+        setSourceUrl(src.replace(/^💡\s*\[(기타|메모)\]\s*/, ''));
       } else {
         setSourceType('link');
         setSourceUrl(src.replace(/^🔗\s*/, ''));
@@ -317,6 +320,10 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
         formattedSource = `📄 [일반] ${formattedSource}`;
       } else if (sourceType === 'other' && !formattedSource.startsWith('💡')) {
         formattedSource = `💡 [기타] ${formattedSource}`;
+      } else if (sourceType === 'youtube') {
+        if (!formattedSource.startsWith('http://') && !formattedSource.startsWith('https://') && !formattedSource.startsWith('www.')) {
+          formattedSource = `https://youtu.be/${formattedSource}`;
+        }
       } else if (sourceType === 'link') {
         if (!formattedSource.startsWith('http://') && !formattedSource.startsWith('https://') && !formattedSource.startsWith('www.') && !formattedSource.startsWith('🔗')) {
           formattedSource = `🔗 ${formattedSource}`;
@@ -502,6 +509,24 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
                 ))}
               </div>
             )}
+
+            {/* Photography preset tags */}
+            <div className="flex items-center gap-1 flex-wrap pt-1.5 border-t border-slate-200/80 mt-1">
+              <span className="text-[10px] font-bold text-amber-800 flex items-center gap-1">
+                <Camera className="w-3 h-3 text-amber-600" />
+                <span>사진 추천:</span>
+              </span>
+              {PHOTO_PRESET_TAGS.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => handleAddTagChip(tag)}
+                  className="text-[10px] px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold rounded border border-amber-200 transition-colors cursor-pointer"
+                >
+                  +{tag}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Importance & Source Grid */}
@@ -548,6 +573,7 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
                   className="px-2 py-0.5 text-xs font-bold border border-slate-300 rounded bg-white text-slate-800 outline-none cursor-pointer"
                 >
                   <option value="link">🔗 웹 링크</option>
+                  <option value="youtube">▶ YouTube 영상</option>
                   <option value="book">📚 도서</option>
                   <option value="general">📄 문서</option>
                   <option value="other">💡 메모</option>
@@ -558,9 +584,17 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
                 type="text"
                 list="existing-source-options"
                 value={sourceUrl}
-                onChange={(e) => setSourceUrl(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSourceUrl(val);
+                  if (extractYouTubeVideoId(val)) {
+                    setSourceType('youtube');
+                  }
+                }}
                 placeholder={
-                  sourceType === 'link'
+                  sourceType === 'youtube'
+                    ? 'https://youtu.be/... (유튜브 링크)'
+                    : sourceType === 'link'
                     ? 'https://...'
                     : sourceType === 'book'
                       ? '도서명 및 저자 (예: 강신주의 노자 혹은 장자)'
@@ -568,6 +602,21 @@ export const RegisterEditModal: React.FC<RegisterEditModalProps> = ({
                 }
                 className="w-full px-2.5 py-1.5 text-xs sm:text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 bg-white text-slate-800"
               />
+
+              {/* Realtime YouTube Video Detection Preview */}
+              {extractYouTubeVideoId(sourceUrl) && (
+                <div className="flex items-center gap-2 p-1.5 bg-red-50/90 border border-red-200 rounded-lg text-xs text-red-900 font-semibold shadow-2xs">
+                  <Youtube className="w-4 h-4 text-red-600 shrink-0 fill-red-600" />
+                  <span className="truncate flex-1 text-[11px]">
+                    YouTube 감지됨 (ID: {extractYouTubeVideoId(sourceUrl)})
+                  </span>
+                  <img
+                    src={getYouTubeThumbnailUrl(extractYouTubeVideoId(sourceUrl)!)}
+                    alt="Preview"
+                    className="w-10 h-6 object-cover rounded shadow-2xs border border-red-200 shrink-0"
+                  />
+                </div>
+              )}
 
               <datalist id="existing-source-options">
                 {(sourceType === 'book' ? existingBookSources : existingAllSources).map((s) => (

@@ -1,8 +1,8 @@
 import React from 'react';
-import { Search, Mic, Plus, Sparkles, Eye, BookOpen, Layers, ArrowRight, Clock } from 'lucide-react';
+import { Search, Mic, Plus, Sparkles, Eye, BookOpen, Layers, ArrowRight, Clock, Youtube } from 'lucide-react';
 import { Idea } from '../types';
 import { formatDate } from '../utils/dateUtils';
-import { SOURCE_CATEGORIES } from '../utils/sourceUtils';
+import { SOURCE_CATEGORIES, extractYouTubeVideoId, isPhotoIdea } from '../utils/sourceUtils';
 
 interface HomeViewProps {
   ideas: Idea[];
@@ -120,6 +120,21 @@ export const HomeView: React.FC<HomeViewProps> = ({
             <span className="text-[10px] text-slate-400 font-mono">({cat.tag})</span>
           </button>
         ))}
+
+        {/* Special Photography quick filter chip */}
+        <button
+          type="button"
+          onClick={() => {
+            onSearchChange('#사진');
+            onSwitchTab('preview');
+          }}
+          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 hover:border-amber-300 shadow-2xs transition-all cursor-pointer active:scale-95"
+          title="사진·카메라·촬영팁 관련 지식 모아보기"
+        >
+          <span>📷</span>
+          <span>사진·촬영</span>
+          <span className="text-[10px] text-amber-700 font-mono">(#사진)</span>
+        </button>
       </div>
 
       {/* Action Buttons */}
@@ -188,6 +203,15 @@ export const HomeView: React.FC<HomeViewProps> = ({
                           <span className="text-xs font-bold text-slate-500 font-mono shrink-0">
                             {formattedDate}
                           </span>
+                        )}
+                        {extractYouTubeVideoId(idea.sourceUrl) && (
+                          <span className="text-[10px] px-1 py-0.2 rounded bg-red-50 text-red-600 font-bold border border-red-200 flex items-center gap-0.5 shrink-0">
+                            <Youtube className="w-2.5 h-2.5 fill-red-600 text-red-600" />
+                            <span>영상</span>
+                          </span>
+                        )}
+                        {isPhotoIdea(idea) && (
+                          <span className="text-xs shrink-0" title="사진 관련 지식">📷</span>
                         )}
                         <span className="text-xs sm:text-sm font-semibold text-slate-800 group-hover:text-blue-600 transition-colors truncate">
                           {idea.title}

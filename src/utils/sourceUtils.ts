@@ -212,3 +212,120 @@ export function extractMainBookTitle(sourceStr?: string): string {
 
   return normalized || clean;
 }
+
+// Photography preset tags for quick categorization
+export const PHOTO_PRESET_TAGS = [
+  '사진',
+  '카메라',
+  '렌즈',
+  '촬영팁',
+  '구도',
+  '노출/조리개',
+  '라이트룸/보정',
+  '풍경/스냅',
+  '인물촬영',
+  '출사',
+];
+
+/**
+ * Checks if an idea is related to photography, cameras, lenses, or photo tips
+ */
+export function isPhotoIdea(idea: { tags?: string[]; title?: string; content?: string }): boolean {
+  const photoKeywords = [
+    '사진',
+    '카메라',
+    '렌즈',
+    '촬영',
+    '출사',
+    '조리개',
+    '셔터',
+    '라이트룸',
+    '보정',
+    '구도',
+    '풍경사진',
+    '인물사진',
+    '바디',
+    '소니',
+    '캐논',
+    '니콘',
+    '후지',
+    'leica',
+    'sony',
+    'canon',
+    'nikon',
+    'fujifilm',
+    'camera',
+    'lens',
+    'photo',
+    'iso',
+  ];
+
+  // 1. Tag match
+  if (idea.tags && idea.tags.some((t) => photoKeywords.some((pk) => t.toLowerCase().includes(pk)))) {
+    return true;
+  }
+
+  // 2. Title match
+  const titleLower = (idea.title || '').toLowerCase();
+  if (photoKeywords.some((pk) => titleLower.includes(pk))) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Extracts YouTube video ID from various YouTube URL formats
+ * (e.g., https://youtu.be/gWzeV_kgwSc, https://www.youtube.com/watch?v=gWzeV_kgwSc,
+ * https://www.youtube.com/embed/gWzeV_kgwSc, https://www.youtube.com/shorts/gWzeV_kgwSc)
+ */
+export function extractYouTubeVideoId(urlOrText?: string): string | null {
+  if (!urlOrText) return null;
+  const match = urlOrText.match(
+    /(?:https?:\/\/)?(?:www\.)?(?:m\.)?(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i
+  );
+  return match ? match[1] : null;
+}
+
+/**
+ * Checks if a string or URL is a YouTube link
+ */
+export function isYouTubeUrl(urlOrText?: string): boolean {
+  return extractYouTubeVideoId(urlOrText) !== null;
+}
+
+/**
+ * Gets high-quality YouTube thumbnail URL
+ */
+export function getYouTubeThumbnailUrl(videoId: string): string {
+  return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+}
+
+/**
+ * Finds the first YouTube URL in an idea (either from sourceUrl or inside content)
+ */
+export function getIdeaYouTubeInfo(idea: {
+  sourceUrl?: string;
+  content?: string;
+}): { videoId: string; thumbnailUrl: string; videoUrl: string } | null {
+  const videoIdFromSource = extractYouTubeVideoId(idea.sourceUrl);
+  if (videoIdFromSource) {
+    return {
+      videoId: videoIdFromSource,
+      thumbnailUrl: getYouTubeThumbnailUrl(videoIdFromSource),
+      videoUrl: idea.sourceUrl?.startsWith('http') ? idea.sourceUrl : `https://youtu.be/${videoIdFromSource}`,
+    };
+  }
+
+  const videoIdFromContent = extractYouTubeVideoId(idea.content);
+  if (videoIdFromContent) {
+    return {
+      videoId: videoIdFromContent,
+      thumbnailUrl: getYouTubeThumbnailUrl(videoIdFromContent),
+      videoUrl: `https://youtu.be/${videoIdFromContent}`,
+    };
+  }
+
+  return null;
+}
+
