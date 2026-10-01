@@ -169,9 +169,9 @@ export function getSourceType(sourceStr?: string): SourceType {
  * Clean up source display text by removing broken unicode symbols (\uFFFD),
  * emoji prefixes (📚, 📄, 💡, 🔗), and brackets ([도서], [일반], etc.)
  */
-export function cleanSourceTitle(sourceStr?: string): string {
+export function cleanSourceTitle(sourceStr?: any): string {
   if (!sourceStr) return '';
-  let cleaned = sourceStr.trim();
+  let cleaned = String(sourceStr).trim();
 
   // 1. Remove leading unicode replacement characters (\uFFFD, \uFEFF) and corrupted glyphs
   cleaned = cleaned.replace(/^[\uFFFD\uFEFF\u0000-\u001F\?\!\s]+/, '');
@@ -194,7 +194,7 @@ export function cleanSourceTitle(sourceStr?: string): string {
  * "강신주의 노자 혹은 장자, p.15" or "강신주의 노자 혹은 장자, 제1장" -> "강신주의 노자 혹은 장자"
  * This prevents identical books with different page annotations from being split into separate 1-item groups.
  */
-export function extractMainBookTitle(sourceStr?: string): string {
+export function extractMainBookTitle(sourceStr?: any): string {
   const clean = cleanSourceTitle(sourceStr);
   if (!clean) return '';
 
@@ -230,7 +230,8 @@ export const PHOTO_PRESET_TAGS = [
 /**
  * Checks if an idea is related to photography, cameras, lenses, or photo tips
  */
-export function isPhotoIdea(idea: { tags?: string[]; title?: string; content?: string }): boolean {
+export function isPhotoIdea(idea?: { tags?: string[]; title?: string; content?: string } | null): boolean {
+  if (!idea) return false;
   const photoKeywords = [
     '사진',
     '카메라',
@@ -261,14 +262,19 @@ export function isPhotoIdea(idea: { tags?: string[]; title?: string; content?: s
   ];
 
   // 1. Tag match
-  if (idea.tags && idea.tags.some((t) => photoKeywords.some((pk) => t.toLowerCase().includes(pk)))) {
-    return true;
+  if (Array.isArray(idea.tags)) {
+    const hasTagMatch = idea.tags.some(
+      (t) => typeof t === 'string' && photoKeywords.some((pk) => t.toLowerCase().includes(pk))
+    );
+    if (hasTagMatch) return true;
   }
 
   // 2. Title match
-  const titleLower = (idea.title || '').toLowerCase();
-  if (photoKeywords.some((pk) => titleLower.includes(pk))) {
-    return true;
+  if (typeof idea.title === 'string') {
+    const titleLower = idea.title.toLowerCase();
+    if (photoKeywords.some((pk) => titleLower.includes(pk))) {
+      return true;
+    }
   }
 
   return false;
@@ -279,8 +285,8 @@ export function isPhotoIdea(idea: { tags?: string[]; title?: string; content?: s
  * (e.g., https://youtu.be/gWzeV_kgwSc, https://www.youtube.com/watch?v=gWzeV_kgwSc,
  * https://www.youtube.com/embed/gWzeV_kgwSc, https://www.youtube.com/shorts/gWzeV_kgwSc)
  */
-export function extractYouTubeVideoId(urlOrText?: string): string | null {
-  if (!urlOrText) return null;
+export function extractYouTubeVideoId(urlOrText?: any): string | null {
+  if (!urlOrText || typeof urlOrText !== 'string') return null;
   const match = urlOrText.match(
     /(?:https?:\/\/)?(?:www\.)?(?:m\.)?(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i
   );

@@ -203,11 +203,14 @@ export const FeedView: React.FC<FeedViewProps> = ({
 
     // 2. Specific Book Shelf filter
     if (selectedSource) {
+      if (!idea.sourceUrl || !String(idea.sourceUrl).trim()) return false;
       const targetKey = selectedSource.trim().toLowerCase();
       const cleanIdea = cleanSourceTitle(idea.sourceUrl).toLowerCase();
       const mainIdea = extractMainBookTitle(idea.sourceUrl).toLowerCase();
-      const matchesSource =
-        cleanIdea.includes(targetKey) || mainIdea.includes(targetKey) || targetKey.includes(mainIdea);
+      const matchesSource = Boolean(
+        (cleanIdea && (cleanIdea.includes(targetKey) || targetKey.includes(cleanIdea))) ||
+        (mainIdea && (mainIdea.includes(targetKey) || targetKey.includes(mainIdea)))
+      );
       if (!matchesSource) return false;
     }
 
@@ -839,7 +842,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
                         {/* Tags */}
                         <div className="flex flex-wrap gap-1.5 pt-0.5">
                           {(idea.tags || []).map((t, idx) => {
-                            const isPhotoTag = PHOTO_PRESET_TAGS.includes(t) || ['사진', '카메라', '렌즈', '촬영'].some((k) => t.includes(k));
+                            const isPhotoTag = typeof t === 'string' && (PHOTO_PRESET_TAGS.includes(t) || ['사진', '카메라', '렌즈', '촬영'].some((k) => t.includes(k)));
                             return (
                               <button
                                 key={idx}

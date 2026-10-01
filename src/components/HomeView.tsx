@@ -205,7 +205,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                           </span>
                         )}
                         {extractYouTubeVideoId(idea.sourceUrl) && (
-                          <span className="text-[10px] px-1 py-0.2 rounded bg-red-50 text-red-600 font-bold border border-red-200 flex items-center gap-0.5 shrink-0">
+                          <span className="text-[10px] px-1 py-0.5 rounded bg-red-50 text-red-600 font-bold border border-red-200 flex items-center gap-0.5 shrink-0">
                             <Youtube className="w-2.5 h-2.5 fill-red-600 text-red-600" />
                             <span>영상</span>
                           </span>
