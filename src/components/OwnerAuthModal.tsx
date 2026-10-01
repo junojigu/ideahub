@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, ShieldCheck, KeyRound, X } from 'lucide-react';
+import { safeStorage } from '../utils/safeStorage';
 
 interface OwnerAuthModalProps {
   isOpen: boolean;
@@ -26,7 +27,7 @@ export const OwnerAuthModal: React.FC<OwnerAuthModalProps> = ({
 
   const handleVerify = (e: React.FormEvent) => {
     e.preventDefault();
-    const localPin = localStorage.getItem(OWNER_PIN_KEY) || DEFAULT_PIN;
+    const localPin = safeStorage.getItem(OWNER_PIN_KEY) || DEFAULT_PIN;
     const inputClean = pinInput.trim();
 
     const isValid =
@@ -49,7 +50,7 @@ export const OwnerAuthModal: React.FC<OwnerAuthModalProps> = ({
       alert('비밀번호는 최소 4자리 이상으로 설정해주세요.');
       return;
     }
-    localStorage.setItem(OWNER_PIN_KEY, newPin.trim());
+    safeStorage.setItem(OWNER_PIN_KEY, newPin.trim());
     alert('소유자 비밀번호가 성공적으로 변경되었습니다!');
     setIsChangingPin(false);
     setNewPin('');

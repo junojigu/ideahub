@@ -13,6 +13,7 @@ import { MergeNotesModal } from './components/MergeNotesModal';
 import { DEFAULT_IDEAS } from './data/defaultIdeas';
 import { Idea, GasConfig, SyncStatus } from './types';
 import { requestGasApi } from './utils/gasApi';
+import { safeStorage } from './utils/safeStorage';
 
 const STORAGE_KEY_IDEAS = 'ideahub_vault_ideas_v2';
 const STORAGE_KEY_RECENT = 'ideahub_vault_recent_v2';
@@ -20,25 +21,59 @@ const STORAGE_KEY_GAS_URL = 'ideahub_vault_gas_url_v2';
 
 const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwxMyj2Ztb5qtIYGHgU2MipDl6hQOv-6xP18EPHdNkPfE0ndN6d6gaCcvTgNgApGqUw/exec';
 
+function sanitizeIdea(raw: any): Idea {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      id: `ID_${Date.now()}`,
+      title: '제목 없음',
+      content: '',
+      tags: [],
+      sourceUrl: '',
+      importance: 1,
+      views: 0,
+      date: new Date().toISOString(),
+    };
+  }
+  const tags = Array.isArray(raw.tags)
+    ? raw.tags.map(String).map((t: string) => t.trim()).filter(Boolean)
+    : typeof raw.tags === 'string'
+      ? raw.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
+      : [];
+
+  return {
+    id: String(raw.id || `ID_${Date.now()}`),
+    title: String(raw.title || ''),
+    content: String(raw.content || ''),
+    tags,
+    sourceUrl: raw.sourceUrl ? String(raw.sourceUrl) : '',
+    importance: typeof raw.importance === 'number' && !isNaN(raw.importance) ? raw.importance : 1,
+    views: typeof raw.views === 'number' && !isNaN(raw.views) ? raw.views : 0,
+    date: raw.date ? String(raw.date) : new Date().toISOString(),
+  };
+}
+
 export default function App() {
   const [ideas, setIdeas] = useState<Idea[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_IDEAS);
+    const saved = safeStorage.getItem(STORAGE_KEY_IDEAS);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(sanitizeIdea);
+        }
       } catch (e) {
         console.error('Failed to parse local storage ideas:', e);
       }
     }
-    return DEFAULT_IDEAS;
+    return DEFAULT_IDEAS.map(sanitizeIdea);
   });
 
   const [recentViewedIds, setRecentViewedIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_RECENT);
+    const saved = safeStorage.getItem(STORAGE_KEY_RECENT);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed.map(String);
       } catch (e) {
         console.error('Failed to parse recent ids:', e);
       }
@@ -47,14 +82,14 @@ export default function App() {
   });
 
   const [gasConfig, setGasConfig] = useState<GasConfig>(() => {
-    let savedUrl = localStorage.getItem(STORAGE_KEY_GAS_URL);
+    let savedUrl = safeStorage.getItem(STORAGE_KEY_GAS_URL);
     if (
       !savedUrl ||
       savedUrl.includes('AKfycbyTP0hfXvAKpmC1USIytbGBO3Mrs1KK_36aeIaDi6Mo5R_nwGmo4Ln_XknsyEWjJxQz') ||
       savedUrl.includes('AKfycbyOe5yknAqXIQmwcbBsLeVip8CTAuRfPjWTQSU3XE_Aw3NA9SVpRWS6mchj56-56_IB')
     ) {
       savedUrl = DEFAULT_GAS_URL;
-      localStorage.setItem(STORAGE_KEY_GAS_URL, DEFAULT_GAS_URL);
+      safeStorage.setItem(STORAGE_KEY_GAS_URL, DEFAULT_GAS_URL);
     }
     return {
       gasUrl: savedUrl,
@@ -64,12 +99,12 @@ export default function App() {
   });
 
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => {
-    const cached = localStorage.getItem(STORAGE_KEY_IDEAS);
+    const cached = safeStorage.getItem(STORAGE_KEY_IDEAS);
     const hasCached = cached && cached !== '[]' && cached.length > 5;
     return {
       connected: Boolean(hasCached),
       isSyncing: false,
-      lastSyncedAt: localStorage.getItem('ideahub_last_synced_at') || undefined,
+      lastSyncedAt: safeStorage.getItem('ideahub_last_synced_at') || undefined,
       message: hasCached ? '로컬 캐시 보관소 활성' : undefined,
     };
   });
@@ -99,15 +134,15 @@ export default function App() {
 
   // Sync state to local storage
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_IDEAS, JSON.stringify(ideas));
+    safeStorage.setItem(STORAGE_KEY_IDEAS, JSON.stringify(ideas));
   }, [ideas]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_RECENT, JSON.stringify(recentViewedIds));
+    safeStorage.setItem(STORAGE_KEY_RECENT, JSON.stringify(recentViewedIds));
   }, [recentViewedIds]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_GAS_URL, gasConfig.gasUrl);
+    safeStorage.setItem(STORAGE_KEY_GAS_URL, gasConfig.gasUrl);
   }, [gasConfig.gasUrl]);
 
   // Load / Sync ideas from Google Apps Script Proxy
@@ -131,7 +166,7 @@ export default function App() {
           if (!isOutdated) {
             setGasConfig((prev) => {
               if (prev.gasUrl !== freshUrl) {
-                localStorage.setItem(STORAGE_KEY_GAS_URL, freshUrl);
+                safeStorage.setItem(STORAGE_KEY_GAS_URL, freshUrl);
                 return { ...prev, gasUrl: freshUrl };
               }
               return prev;
@@ -148,9 +183,10 @@ export default function App() {
       }
 
       if (data && Array.isArray(data.ideas) && data.ideas.length > 0) {
+        const sanitizedRemote = data.ideas.map(sanitizeIdea);
         // Merge remote ideas without wiping out freshly created local items
         setIdeas((currentLocal) => {
-          const remoteIds = new Set(data.ideas.map((i: Idea) => String(i.id)));
+          const remoteIds = new Set(sanitizedRemote.map((i: Idea) => String(i.id)));
           const localOnlyRecent = currentLocal.filter((local) => {
             if (remoteIds.has(String(local.id))) return false;
             const tsMatch = String(local.id).match(/ID_(\d+)/);
@@ -160,10 +196,10 @@ export default function App() {
             }
             return false;
           });
-          return [...localOnlyRecent, ...data.ideas];
+          return [...localOnlyRecent, ...sanitizedRemote];
         });
         const syncTimeStr = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-        localStorage.setItem('ideahub_last_synced_at', syncTimeStr);
+        safeStorage.setItem('ideahub_last_synced_at', syncTimeStr);
         setSyncStatus({
           connected: true,
           isSyncing: false,
@@ -172,7 +208,7 @@ export default function App() {
         });
       } else if (data && Array.isArray(data.ideas) && data.ideas.length === 0) {
         const syncTimeStr = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-        localStorage.setItem('ideahub_last_synced_at', syncTimeStr);
+        safeStorage.setItem('ideahub_last_synced_at', syncTimeStr);
         setSyncStatus({
           connected: true,
           isSyncing: false,
