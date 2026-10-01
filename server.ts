@@ -39,6 +39,40 @@ const getGeminiClient = () => {
   });
 };
 
+/**
+ * Executes Gemini generateContent with automatic model fallback
+ * Handles transient 503 (high demand) and 429 rate limit spikes automatically
+ */
+async function callGeminiWithFallback(ai: GoogleGenAI, options: {
+  contents: any;
+  config?: any;
+  preferredModel?: string;
+}) {
+  const modelChain = [
+    options.preferredModel || "gemini-3.1-flash-lite",
+    "gemini-3.8-flash",
+    "gemini-flash-latest"
+  ];
+
+  let lastError: any = null;
+  for (const model of modelChain) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: options.contents,
+        config: options.config,
+      });
+      if (response && response.text) {
+        return response;
+      }
+    } catch (err: any) {
+      console.warn(`[Gemini API] Model ${model} encountered an issue:`, err?.message || err);
+      lastError = err;
+    }
+  }
+  throw lastError || new Error("모든 AI 모델 호출에 실패했습니다.");
+}
+
 // 1. Health check
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
@@ -109,8 +143,8 @@ Idea Content: "${content || "내용 없음"}"
 
 Return JSON matching the schema.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+    const response = await callGeminiWithFallback(ai, {
+      preferredModel: "gemini-3.1-flash-lite",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -166,8 +200,8 @@ Generate a compelling synthesis in Korean with:
 
 Return valid JSON according to schema.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+    const response = await callGeminiWithFallback(ai, {
+      preferredModel: "gemini-3.1-flash-lite",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -224,8 +258,8 @@ ${notesContent}
 
 Return JSON according to the schema.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+    const response = await callGeminiWithFallback(ai, {
+      preferredModel: "gemini-3.1-flash-lite",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -253,40 +287,69 @@ Return JSON according to the schema.`;
 app.post("/api/gemini/chat", async (req, res) => {
   try {
     const { question, ideas } = req.body;
-    if (!question) {
-      return res.status(400).json({ error: "Question is required" });
+    if (!question || !String(question).trim()) {
+      return res.status(400).json({ error: "질문 내용을 입력해주세요." });
     }
 
     const ai = getGeminiClient();
-    const vaultContext = (ideas || [])
-      .map((item: any) => `[ID: ${item.id}] 제목: ${item.title} | 태그: ${(item.tags || []).join(", ")} | 내용: ${item.content}`)
-      .join("\n");
+    const cleanQuestion = String(question).trim();
+    const userTerms = cleanQuestion.toLowerCase().split(/\s+/).filter((t: string) => t.length > 1);
 
-    const prompt = `You are IdeaHub AI, a smart knowledge vault assistant.
-Answer the user's question accurately in polite Korean, referencing specific notes in the vault when relevant.
+    // Score and rank notes by relevance to the question
+    const scoredIdeas = (ideas || []).map((item: any) => {
+      let score = 0;
+      const t = (item.title || "").toLowerCase();
+      const c = (item.content || "").toLowerCase();
+      const tags = (item.tags || []).join(" ").toLowerCase();
 
-User Question: "${question}"
+      for (const term of userTerms) {
+        if (t.includes(term)) score += 5;
+        if (tags.includes(term)) score += 3;
+        if (c.includes(term)) score += 1;
+      }
+      return { item, score };
+    });
 
-Knowledge Vault Notes (${(ideas || []).length} items):
-${vaultContext || "No notes saved yet."}
+    scoredIdeas.sort((a: any, b: any) => b.score - a.score);
 
-Provide a helpful, well-structured response in Markdown. Also identify which note IDs (e.g. "ID_1719361200000") were referenced in your answer.
+    // Prioritize top 30 most relevant notes with full content, and next 50 with title & tags
+    const relevantFull = scoredIdeas.slice(0, 30).map((s: any) => s.item);
+    const relevantBrief = scoredIdeas.slice(30, 70).map((s: any) => s.item);
 
-Return JSON according to schema.`;
+    const vaultContext = [
+      ...relevantFull.map((item: any) => `[ID: ${item.id}] 제목: ${item.title} | 태그: ${(item.tags || []).join(", ")} | 본문: ${item.content}`),
+      ...relevantBrief.map((item: any) => `[ID: ${item.id}] 제목: ${item.title} | 태그: ${(item.tags || []).join(", ")}`)
+    ].join("\n\n");
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+    const prompt = `당신은 IdeaHub 지식창고의 전담 AI 비서입니다.
+사용자의 질문에 대해 저장된 지식 노트를 철저히 분석하여 공손하고 유익한 한국어로 답변해 주세요.
+
+[사용자 질문]:
+"${cleanQuestion}"
+
+[사용자의 지식창고 보관 노트 (${(ideas || []).length}개 중 추출)]:
+${vaultContext || "보관된 지식 노트가 없습니다."}
+
+[답변 작성 가이드]:
+1. 지식창고에 저장된 구체적 내용과 제목을 적극 인용하여 상세하고 신뢰성 있게 설명할 것.
+2. 마크다운 형식(소제목, 글머리 기호, 볼드체 등)을 활용하여 가독성 높게 구성할 것.
+3. 답변을 도출하는 데 직접적으로 참고한 노트들의 ID(예: "ID-1781960264270")를 referencedIdeaIds 배열에 담아 전달할 것.
+
+Return JSON according to the schema.`;
+
+    const response = await callGeminiWithFallback(ai, {
+      preferredModel: "gemini-3.1-flash-lite",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            answer: { type: Type.STRING, description: "Detailed Markdown response in Korean" },
+            answer: { type: Type.STRING, description: "상세하고 체계적인 한국어 마크다운 답변" },
             referencedIdeaIds: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
-              description: "Array of note IDs referenced"
+              description: "참고한 지식 노트의 고유 ID 목록"
             }
           },
           required: ["answer"]
@@ -298,7 +361,7 @@ Return JSON according to schema.`;
     return res.json(result);
   } catch (error: any) {
     console.error("Gemini Chat Error:", error);
-    return res.status(500).json({ error: error?.message || "Failed to generate chat response" });
+    return res.status(500).json({ error: error?.message || "AI 지식 비서 응답 생성에 실패했습니다." });
   }
 });
 

@@ -53,7 +53,8 @@ export const AiChatView: React.FC<AiChatViewProps> = ({ ideas, onOpenPreviewModa
       });
 
       if (!response.ok) {
-        throw new Error('AI 지식 비서 응답에 실패했습니다.');
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.error || `서버 응답 오류 (${response.status})`);
       }
 
       const data = await response.json();
@@ -71,7 +72,7 @@ export const AiChatView: React.FC<AiChatViewProps> = ({ ideas, onOpenPreviewModa
       const errorMsg: ChatMessage = {
         id: `err_${Date.now()}`,
         sender: 'ai',
-        text: `⚠️ 오류가 발생했습니다: ${error?.message || 'Gemini API 호출 오류'}`,
+        text: `⚠️ **AI 응답 오류**: ${error?.message || 'Gemini API 호출에 실패했습니다.'}\n\n일시적인 네트워크 지연이나 모델 트래픽 문제일 수 있으니 아래 '다시 질문하기' 버튼을 눌러보세요.`,
         timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -123,13 +124,31 @@ export const AiChatView: React.FC<AiChatViewProps> = ({ ideas, onOpenPreviewModa
                 <div
                   className={`p-4 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-2xs ${
                     isAi
-                      ? 'bg-white text-slate-800 border border-slate-200'
+                      ? msg.id.startsWith('err_')
+                        ? 'bg-rose-50 text-rose-900 border border-rose-200'
+                        : 'bg-white text-slate-800 border border-slate-200'
                       : 'bg-blue-600 text-white font-medium'
                   }`}
                 >
                   {isAi ? (
-                    <div className="markdown-body space-y-2">
-                      <ReactMarkdown>{msg.text}</ReactMarkdown>
+                    <div className="space-y-2">
+                      <div className="markdown-body">
+                        <ReactMarkdown>{msg.text}</ReactMarkdown>
+                      </div>
+                      {msg.id.startsWith('err_') && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const lastUserMsg = [...messages].reverse().find(m => m.sender === 'user');
+                            if (lastUserMsg) handleSendMessage(lastUserMsg.text);
+                          }}
+                          disabled={isLoading}
+                          className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-purple-600 hover:bg-purple-700 text-white transition-all cursor-pointer shadow-2xs active:scale-95"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>다시 질문하기 (재시도)</span>
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <p className="whitespace-pre-wrap">{msg.text}</p>

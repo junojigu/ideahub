@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { ArrowUp } from 'lucide-react';
 import { Header } from './components/Header';
 import { HomeView } from './components/HomeView';
 import { FeedView } from './components/FeedView';
@@ -131,6 +132,29 @@ export default function App() {
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
   const [selectedIdeasToMerge, setSelectedIdeasToMerge] = useState<Idea[]>([]);
   const [isContinuousReadingActive, setIsContinuousReadingActive] = useState(false);
+
+  // Scroll to Top state & listener
+  const [showTopBtn, setShowTopBtn] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 240) {
+        setShowTopBtn(true);
+      } else {
+        setShowTopBtn(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    });
+  };
 
   // Sync state to local storage
   useEffect(() => {
@@ -751,6 +775,22 @@ export default function App() {
         onBatchPushToGas={handleBatchPushToGas}
         ideasCount={ideas.length}
       />
+
+      {/* Floating Scroll To Top Button */}
+      <button
+        type="button"
+        onClick={scrollToTop}
+        aria-label="맨 위로 이동"
+        title="맨 위로 이동 (Top)"
+        className={`fixed bottom-6 right-6 z-40 w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-slate-900/90 hover:bg-blue-600 text-white shadow-xl hover:shadow-2xl border border-white/20 backdrop-blur-md flex flex-col items-center justify-center transition-all duration-300 group cursor-pointer active:scale-90 ${
+          showTopBtn
+            ? 'opacity-100 translate-y-0 pointer-events-auto'
+            : 'opacity-0 translate-y-6 pointer-events-none'
+        }`}
+      >
+        <ArrowUp className="w-4 h-4 sm:w-4.5 sm:h-4.5 group-hover:-translate-y-0.5 transition-transform stroke-[2.5]" />
+        <span className="text-[9px] font-black tracking-wider uppercase leading-none mt-0.5">TOP</span>
+      </button>
 
     </div>
   );

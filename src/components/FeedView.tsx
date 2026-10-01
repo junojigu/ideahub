@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { 
   Sparkles, RotateCw, Filter, ChevronDown, Trash2, ArrowUpDown, 
   Star, Eye, PenSquare, ArrowRight, ExternalLink, Book, FileText, Lightbulb,
-  Download, Network, CheckSquare, Square, Plus, Layers, X, Youtube, Play, Camera
+  Download, Network, CheckSquare, Square, Plus, Layers, X, Youtube, Play, Camera,
+  ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight
 } from 'lucide-react';
 import { Idea } from '../types';
 import { formatDate, parseTimestamp } from '../utils/dateUtils';
@@ -268,13 +269,22 @@ export const FeedView: React.FC<FeedViewProps> = ({
       : valB.localeCompare(valA, 'ko');
   });
 
-  // Pagination
+  // Pagination (10 pages per group)
+  const PAGES_PER_BLOCK = 10;
   const totalPages = Math.ceil(sortedIdeas.length / pageSize) || 1;
   const validCurrentPage = Math.min(currentPage, totalPages);
   const paginatedIdeas = sortedIdeas.slice(
     (validCurrentPage - 1) * pageSize,
     validCurrentPage * pageSize
   );
+
+  const currentBlock = Math.floor((validCurrentPage - 1) / PAGES_PER_BLOCK);
+  const startPage = currentBlock * PAGES_PER_BLOCK + 1;
+  const endPage = Math.min(startPage + PAGES_PER_BLOCK - 1, totalPages);
+  const pageNumbers: number[] = [];
+  for (let p = startPage; p <= endPage; p++) {
+    pageNumbers.push(p);
+  }
 
   // Main Tag statistics
   const tagFreq = new Map<string, number>();
@@ -491,10 +501,10 @@ export const FeedView: React.FC<FeedViewProps> = ({
   };
 
   return (
-    <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
+    <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 items-start">
       
-      {/* Left Feed Column */}
-      <div className="flex flex-col gap-5">
+      {/* Right Feed Column (Search Results) */}
+      <div className="flex flex-col gap-5 min-w-0 lg:col-start-2 lg:row-start-1">
         
         {/* Toolbar Header */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3.5">
@@ -921,36 +931,104 @@ export const FeedView: React.FC<FeedViewProps> = ({
           )}
         </div>
 
-        {/* Pagination */}
+        {/* Pagination: << < 1 2 3 4 5 6 7 8 9 10 > >> */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 pt-4 pb-6">
-            {Array.from({ length: totalPages }).map((_, idx) => {
-              const pageNum = idx + 1;
-              const isActive = pageNum === validCurrentPage;
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => {
-                    setCurrentPage(pageNum);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  className={`text-sm font-extrabold px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-blue-600 text-white shadow-2xs'
-                      : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
+          <div className="flex items-center justify-center gap-1 sm:gap-1.5 pt-6 pb-8 select-none flex-wrap">
+            {/* 맨첫페이지로 << */}
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentPage(1);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              disabled={validCurrentPage === 1}
+              className="px-2 sm:px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600 hover:border-blue-300 disabled:opacity-35 disabled:hover:bg-white disabled:hover:text-slate-400 disabled:hover:border-slate-200 disabled:cursor-not-allowed transition-all font-bold text-xs flex items-center gap-0.5 shadow-2xs cursor-pointer"
+              title="맨첫페이지로 (1페이지)"
+              aria-label="맨첫페이지로"
+            >
+              <ChevronsLeft className="w-4 h-4" />
+              <span className="hidden md:inline text-[11px]">처음</span>
+            </button>
+
+            {/* 이전 페이지로 < */}
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentPage(Math.max(1, validCurrentPage - 1));
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              disabled={validCurrentPage === 1}
+              className="px-2 sm:px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600 hover:border-blue-300 disabled:opacity-35 disabled:hover:bg-white disabled:hover:text-slate-400 disabled:hover:border-slate-200 disabled:cursor-not-allowed transition-all font-bold text-xs flex items-center gap-0.5 shadow-2xs cursor-pointer"
+              title="이전 페이지"
+              aria-label="이전 페이지"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span className="hidden md:inline text-[11px]">이전</span>
+            </button>
+
+            {/* 10개 단위 페이지 번호 목록 */}
+            <div className="flex items-center gap-1 mx-0.5 sm:mx-1">
+              {pageNumbers.map((pageNum) => {
+                const isActive = pageNum === validCurrentPage;
+                return (
+                  <button
+                    key={pageNum}
+                    type="button"
+                    onClick={() => {
+                      setCurrentPage(pageNum);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className={`min-w-8 sm:min-w-9 h-8 sm:h-9 px-2 text-xs sm:text-sm font-extrabold rounded-xl transition-all cursor-pointer flex items-center justify-center ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-2xs scale-105 ring-2 ring-blue-200'
+                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-blue-300 hover:text-blue-600'
+                    }`}
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 다음 페이지로 > */}
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentPage(Math.min(totalPages, validCurrentPage + 1));
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              disabled={validCurrentPage === totalPages}
+              className="px-2 sm:px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600 hover:border-blue-300 disabled:opacity-35 disabled:hover:bg-white disabled:hover:text-slate-400 disabled:hover:border-slate-200 disabled:cursor-not-allowed transition-all font-bold text-xs flex items-center gap-0.5 shadow-2xs cursor-pointer"
+              title="다음 페이지"
+              aria-label="다음 페이지"
+            >
+              <span className="hidden md:inline text-[11px]">다음</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+
+            {/* 맨마지막 페이지로 >> */}
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentPage(totalPages);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              disabled={validCurrentPage === totalPages}
+              className="px-2 sm:px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600 hover:border-blue-300 disabled:opacity-35 disabled:hover:bg-white disabled:hover:text-slate-400 disabled:hover:border-slate-200 disabled:cursor-not-allowed transition-all font-bold text-xs flex items-center gap-0.5 shadow-2xs cursor-pointer"
+              title={`맨마지막 페이지로 (${totalPages}페이지)`}
+              aria-label="맨마지막 페이지로"
+            >
+              <span className="hidden md:inline text-[11px]">끝</span>
+              <ChevronsRight className="w-4 h-4" />
+            </button>
           </div>
         )}
 
       </div>
 
-      {/* Right Sidebar Column */}
-      <aside className="space-y-6 sticky top-20">
+      {/* Left Sidebar Column (오늘 되짚어볼 지식 & 도서 서재) */}
+      <aside className="space-y-6 sticky top-20 min-w-0 lg:col-start-1 lg:row-start-1">
         <div className="bg-slate-100/80 border border-slate-200/80 rounded-2xl p-5 space-y-6 shadow-2xs">
           
           {/* Today Flashback Recommendation */}
