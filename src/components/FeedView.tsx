@@ -74,6 +74,32 @@ export const FeedView: React.FC<FeedViewProps> = ({
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [selectedSourceCategory, setSelectedSourceCategory] = useState<SourceCategory>('all');
   
+  // Collapsible accordion toggle state for Book & Source shelf categories ('도서'만 기본 펼침)
+  const [expandedSourceCategories, setExpandedSourceCategories] = useState<Record<string, boolean>>({
+    book: true,
+    document: false,
+    memo: false,
+    link: false,
+  });
+
+  const toggleSourceCategory = (catKey: string) => {
+    setExpandedSourceCategories((prev) => ({
+      ...prev,
+      [catKey]: !prev[catKey],
+    }));
+  };
+
+  const allCategoriesExpanded = Object.values(expandedSourceCategories).every(Boolean);
+  const toggleAllSourceCategories = () => {
+    const nextState = !allCategoriesExpanded;
+    setExpandedSourceCategories({
+      book: nextState,
+      document: nextState,
+      memo: nextState,
+      link: nextState,
+    });
+  };
+  
   // Tag dropdown & search states
   const [isTagDropdownOpen, setIsTagDropdownOpen] = useState(false);
   const [tagSearchQuery, setTagSearchQuery] = useState('');
@@ -1073,93 +1099,126 @@ export const FeedView: React.FC<FeedViewProps> = ({
 
           <div className="h-px bg-slate-200"></div>
 
-          {/* Book Shelf (도서 및 출처별 서재) */}
+          {/* Book Shelf (도서 및 출처별 서재) - 토글 형태 (도서, 문서, 메모, 웹링크) */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-extrabold text-slate-900 text-sm font-sans flex items-center gap-1.5">
                 <Book className="w-4 h-4 text-amber-600" />
                 <span>도서 및 출처 서재 ({sourceStats.length}개)</span>
               </h3>
-              {selectedSource && (
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setSelectedSource(null)}
-                  className="text-[11px] text-blue-600 font-bold hover:underline cursor-pointer"
+                  type="button"
+                  onClick={toggleAllSourceCategories}
+                  className="text-[11px] text-slate-500 hover:text-slate-800 font-bold transition-colors cursor-pointer"
                 >
-                  전체 보기
+                  {allCategoriesExpanded ? '전체 접기' : '전체 펼치기'}
                 </button>
-              )}
+                {selectedSource && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSource(null)}
+                    className="text-[11px] text-blue-600 font-bold hover:underline cursor-pointer"
+                  >
+                    필터 해제
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
               {sourceStats.length === 0 ? (
                 <p className="text-xs text-slate-400 py-1">등록된 출처가 없습니다.</p>
               ) : (
-                sourceStats.map((src, idx) => {
-                  const isSelected = selectedSource?.toLowerCase() === src.displayName.toLowerCase();
-                  const prevCategory = idx > 0 ? sourceStats[idx - 1].category : null;
-                  const isNewCategory = src.category !== prevCategory;
-                  const catLabel =
-                    src.category === 'book'
-                      ? '📚 도서'
-                      : src.category === 'document'
-                      ? '📄 문서'
-                      : src.category === 'memo'
-                      ? '💡 메모'
-                      : '🔗 웹링크';
-
-                  const formattedName =
-                    src.isYouTube && !src.displayName.startsWith('[YouTube]')
-                      ? `[YouTube] ${src.displayName}`
-                      : src.category === 'book' && !src.displayName.startsWith('[도서]')
-                      ? `[도서] ${src.displayName}`
-                      : src.category === 'document' && !src.displayName.startsWith('[문서]')
-                      ? `[문서] ${src.displayName}`
-                      : src.category === 'memo' && !src.displayName.startsWith('[메모]')
-                      ? `[메모] ${src.displayName}`
-                      : src.displayName;
+                ([
+                  { category: 'book' as const, label: '도서', icon: '📚' },
+                  { category: 'document' as const, label: '문서', icon: '📄' },
+                  { category: 'memo' as const, label: '메모', icon: '💡' },
+                  { category: 'link' as const, label: '웹링크', icon: '🔗' },
+                ]).map((sec) => {
+                  const sectionItems = sourceStats.filter((s) => s.category === sec.category);
+                  const isExpanded = !!expandedSourceCategories[sec.category];
+                  const totalCount = sourceCategoryCounts[sec.category] || 0;
 
                   return (
-                    <React.Fragment key={src.displayName}>
-                      {isNewCategory && (
-                        <div className="pt-2.5 pb-1 text-[11px] font-black text-slate-600 flex items-center justify-between border-t border-slate-200/80 first:border-t-0 first:pt-0">
-                          <span className="flex items-center gap-1.5">{catLabel}</span>
-                          <span className="text-[10px] text-slate-400 font-mono font-medium">
-                            {sourceCategoryCounts[src.category]}개
-                          </span>
-                        </div>
-                      )}
+                    <div
+                      key={sec.category}
+                      className="rounded-xl border border-slate-200/90 bg-white overflow-hidden shadow-2xs transition-all"
+                    >
+                      {/* Category Toggle Header Button */}
                       <button
-                        key={src.displayName}
-                        onClick={() => setSelectedSource(isSelected ? null : src.displayName)}
-                        className={`w-full px-3 py-2 rounded-xl text-xs text-left transition-all cursor-pointer flex items-center justify-between gap-2 border ${
-                          isSelected
-                            ? 'bg-amber-100 text-amber-950 font-black border-amber-300 shadow-2xs'
-                            : 'bg-white hover:bg-slate-50 text-slate-700 font-semibold border-slate-200 hover:border-slate-300'
-                        }`}
+                        type="button"
+                        onClick={() => toggleSourceCategory(sec.category)}
+                        className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/90 text-slate-800 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer"
+                        aria-expanded={isExpanded}
                       >
-                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                          <span className="shrink-0">
-                            {src.isYouTube ? (
-                              <Youtube className="w-3.5 h-3.5 text-red-600 inline" />
-                            ) : src.category === 'book' ? (
-                              '📚'
-                            ) : src.category === 'document' ? (
-                              '📄'
-                            ) : src.category === 'memo' ? (
-                              '💡'
-                            ) : (
-                              '🔗'
-                            )}
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <ChevronDown
+                            className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform duration-200 ${
+                              isExpanded ? 'rotate-0' : '-rotate-90'
+                            }`}
+                          />
+                          <span className="text-sm shrink-0">{sec.icon}</span>
+                          <span className="font-extrabold text-slate-900 truncate">{sec.label}</span>
+                          <span className="text-[10px] text-slate-400 font-mono font-medium shrink-0">
+                            ({sectionItems.length}종 / {totalCount}개)
                           </span>
-                          <span className="truncate">{formattedName}</span>
                         </div>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 font-bold ${
-                          isSelected ? 'bg-amber-200 text-amber-900' : 'bg-slate-100 text-slate-500'
-                        }`}>
-                          {src.count}
+                        <span className="text-[10px] text-slate-400 font-medium shrink-0">
+                          {isExpanded ? '접기' : '펼치기'}
                         </span>
                       </button>
-                    </React.Fragment>
+
+                      {/* Sub-items list */}
+                      {isExpanded && (
+                        <div className="p-1.5 space-y-1 bg-slate-50/40 border-t border-slate-100">
+                          {sectionItems.length === 0 ? (
+                            <p className="text-[11px] text-slate-400 py-1.5 px-2">
+                              등록된 {sec.label} 항목이 없습니다.
+                            </p>
+                          ) : (
+                            sectionItems.map((src) => {
+                              const isSelected =
+                                selectedSource?.toLowerCase() === src.displayName.toLowerCase();
+
+                              return (
+                                <button
+                                  key={src.displayName}
+                                  type="button"
+                                  onClick={() =>
+                                    setSelectedSource(isSelected ? null : src.displayName)
+                                  }
+                                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs text-left transition-all cursor-pointer flex items-center justify-between gap-2 border ${
+                                    isSelected
+                                      ? 'bg-amber-100 text-amber-950 font-black border-amber-300 shadow-2xs ring-1 ring-amber-300'
+                                      : 'bg-white hover:bg-slate-50 text-slate-700 font-semibold border-slate-200/80 hover:border-slate-300'
+                                  }`}
+                                  title={src.displayName}
+                                >
+                                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                    {src.isYouTube ? (
+                                      <Youtube className="w-3.5 h-3.5 text-red-600 inline shrink-0" />
+                                    ) : (
+                                      <span className="w-1 h-1 rounded-full bg-slate-400 shrink-0" />
+                                    )}
+                                    <span className="truncate">{src.displayName}</span>
+                                  </div>
+                                  <span
+                                    className={`text-[10px] px-1.5 py-0.2 rounded-full shrink-0 font-bold ${
+                                      isSelected
+                                        ? 'bg-amber-200 text-amber-900'
+                                        : 'bg-slate-100 text-slate-500'
+                                    }`}
+                                  >
+                                    {src.count}
+                                  </span>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
                   );
                 })
               )}

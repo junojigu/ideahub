@@ -159,7 +159,7 @@ export function getSourceType(sourceStr?: string): SourceType {
   if (s.includes('[도서]') || s.includes('📚') || s.startsWith('도서:') || s.startsWith('책:')) {
     return 'book';
   }
-  if (s.includes('[일반]') || s.includes('📄') || s.startsWith('문서:')) {
+  if (s.includes('[문서]') || s.includes('[일반]') || s.includes('📄') || s.startsWith('문서:')) {
     return 'general';
   }
   return 'other';
@@ -167,23 +167,28 @@ export function getSourceType(sourceStr?: string): SourceType {
 
 /**
  * Clean up source display text by removing broken unicode symbols (\uFFFD),
- * emoji prefixes (📚, 📄, 💡, 🔗), and brackets ([도서], [일반], etc.)
+ * emoji prefixes (📚, 📄, 💡, 🔗), and brackets ([도서], [일반], [문서], [메모], [기타], etc.)
+ * Repeatedly cleans multiple sequential tags like "[문서][일반] 나무위키" -> "나무위키"
  */
 export function cleanSourceTitle(sourceStr?: any): string {
   if (!sourceStr) return '';
   let cleaned = String(sourceStr).trim();
 
-  // 1. Remove leading unicode replacement characters (\uFFFD, \uFEFF) and corrupted glyphs
-  cleaned = cleaned.replace(/^[\uFFFD\uFEFF\u0000-\u001F\?\!\s]+/, '');
-
-  // 2. Remove emoji icons at start
-  cleaned = cleaned.replace(/^[📚📄💡🔗📖🔖📌📁]\s*/, '');
-
-  // 3. Remove bracket tags like [도서], [일반], [기타], [링크], [웹]
-  cleaned = cleaned.replace(/^\[(도서|일반|기타|링크|웹|자료|메모)\]\s*/i, '');
-
-  // 4. In case emoji came after or before tag or another broken char was repeated
-  cleaned = cleaned.replace(/^[\uFFFD\uFEFF\s📚📄💡🔗\-\:]+/, '');
+  // Continuously strip leading brackets, emojis, colons, and replacement characters
+  let prev = '';
+  while (cleaned !== prev) {
+    prev = cleaned;
+    // 1. Remove replacement/corrupted glyphs & whitespace
+    cleaned = cleaned.replace(/^[\uFFFD\uFEFF\u0000-\u001F\?\!\s]+/, '');
+    // 2. Remove leading emojis
+    cleaned = cleaned.replace(/^[📚📄💡🔗📖🔖📌📁🎬📺\s]+/, '');
+    // 3. Remove bracket tags like [도서], [문서], [일반], [메모], [기타], [웹링크], [링크], [웹], [자료], [YouTube]
+    cleaned = cleaned.replace(/^\[(도서|문서|일반|메모|기타|웹링크|링크|웹|자료|유튜브|youtube)\]\s*/i, '');
+    // 4. Remove colon prefixes like 출처:, 문서:, 도서:, 메모:, 링크:
+    cleaned = cleaned.replace(/^(출처|도서|문서|메모|링크|자료)\s*[:：]\s*/i, '');
+    // 5. Remove remaining leading hyphens, dashes, colons, spaces
+    cleaned = cleaned.replace(/^[\-\:：\s]+/, '');
+  }
 
   return cleaned.trim();
 }
