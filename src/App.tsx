@@ -633,7 +633,7 @@ export default function App() {
       )}
 
       {/* Main Tab Content */}
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col bg-[#FAFAFA]">
         {currentTab === 'home' && (
           <HomeView
             ideas={ideas}
@@ -647,6 +647,10 @@ export default function App() {
               setIsRegisterModalOpen(true);
             }}
             onTriggerCreativeModal={() => setIsCreativeModalOpen(true)}
+            onSelectTag={(tag) => {
+              setSelectedTags([tag]);
+              setCurrentTab('preview');
+            }}
           />
         )}
 

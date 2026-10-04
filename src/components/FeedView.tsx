@@ -408,7 +408,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
     setCurrentPage(1);
   };
 
-  // Helper for source badges (special support for YouTube videos)
+  // Helper for source badges (minimal interactive source filter control)
   const renderSourceBadge = (idea: Idea) => {
     const sourceStr = idea.sourceUrl;
     if (!sourceStr) return null;
@@ -418,7 +418,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
     const mainTitle = extractMainBookTitle(sourceStr);
     const type = getSourceType(sourceStr);
 
-    // YouTube Video Link: show dedicated red badge with play button
+    // YouTube Video Link: show compact play control
     const ytVideoId = extractYouTubeVideoId(sourceStr);
     if (ytVideoId) {
       return (
@@ -433,15 +433,12 @@ export const FeedView: React.FC<FeedViewProps> = ({
               idea,
             });
           }}
-          className="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-bold rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-all cursor-pointer shrink-0 shadow-2xs group/yt"
+          className="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-semibold rounded-md bg-red-50 hover:bg-red-100 text-red-700 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
           title="클릭하여 유튜브 영상 바로 시청"
         >
-          <div className="w-3.5 h-3.5 rounded bg-red-600 flex items-center justify-center text-white shrink-0 group-hover/yt:scale-110 transition-transform">
-            <Play className="w-2 h-2 fill-white ml-0.5" />
-          </div>
-          <span className="font-extrabold text-red-600">YouTube</span>
-          <span className="max-w-[120px] truncate text-red-950 font-medium">
-            {clean.includes('youtu') ? '영상 시청' : clean}
+          <Play className="w-3 h-3 fill-red-600 text-red-600 shrink-0" />
+          <span className="max-w-[140px] truncate">
+            {clean.includes('youtu') ? 'YouTube 영상' : clean}
           </span>
         </button>
       );
@@ -455,231 +452,80 @@ export const FeedView: React.FC<FeedViewProps> = ({
           target="_blank"
           rel="noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 shrink-0"
+          className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md bg-slate-100 hover:bg-slate-200/80 text-slate-700 transition-colors shrink-0 whitespace-nowrap"
           title="원문 링크"
         >
-          <ExternalLink className="w-3 h-3" />
-          <span className="max-w-[120px] truncate">{cleanQuery ? renderHighlightedText(clean, cleanQuery) : clean}</span>
+          <ExternalLink className="w-3 h-3 text-slate-500 shrink-0" />
+          <span className="max-w-[140px] truncate">{cleanQuery ? renderHighlightedText(clean, cleanQuery) : clean}</span>
         </a>
       );
     }
 
-    if (type === 'book') {
-      return (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setSelectedSource((prev) => (prev === mainTitle ? null : mainTitle));
-          }}
-          className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-lg border transition-all cursor-pointer shrink-0 ${
-            selectedSource === mainTitle
-              ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
-              : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200'
-          }`}
-          title={`클릭하여 '${mainTitle}' 메모만 모아보기`}
-        >
-          <Book className="w-3 h-3 text-amber-600" />
-          <span className="max-w-[120px] truncate">{cleanQuery ? renderHighlightedText(clean, cleanQuery) : clean}</span>
-        </button>
-      );
-    }
-
-    if (type === 'general') {
-      return (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setSelectedSource((prev) => (prev === clean ? null : clean));
-          }}
-          className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-lg border transition-all cursor-pointer shrink-0 ${
-            selectedSource === clean
-              ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
-              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-200'
-          }`}
-          title="클릭하여 이 문서 메모만 모아보기"
-        >
-          <FileText className="w-3 h-3 text-emerald-600" />
-          <span className="max-w-[120px] truncate">{cleanQuery ? renderHighlightedText(clean, cleanQuery) : clean}</span>
-        </button>
-      );
-    }
+    const filterTarget = type === 'book' ? mainTitle : clean;
+    const isActiveSource = selectedSource === filterTarget;
 
     return (
       <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          setSelectedSource((prev) => (prev === clean ? null : clean));
+          setSelectedSource((prev) => (prev === filterTarget ? null : filterTarget));
         }}
-        className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-lg border transition-all cursor-pointer shrink-0 ${
-          selectedSource === clean
-            ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
-            : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-indigo-200'
+        className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md transition-colors cursor-pointer shrink-0 whitespace-nowrap ${
+          isActiveSource
+            ? 'bg-slate-900 text-white font-semibold'
+            : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700'
         }`}
-        title="클릭하여 이 출처 메모만 모아보기"
+        title={`클릭하여 '${filterTarget}' 메모만 모아보기`}
       >
-        <Lightbulb className="w-3 h-3 text-indigo-600" />
-        <span className="max-w-[120px] truncate">{cleanQuery ? renderHighlightedText(clean, cleanQuery) : clean}</span>
+        {type === 'book' ? (
+          <Book className={`w-3 h-3 shrink-0 ${isActiveSource ? 'text-amber-300' : 'text-slate-500'}`} />
+        ) : type === 'general' ? (
+          <FileText className={`w-3 h-3 shrink-0 ${isActiveSource ? 'text-emerald-300' : 'text-slate-500'}`} />
+        ) : (
+          <Lightbulb className={`w-3 h-3 shrink-0 ${isActiveSource ? 'text-indigo-300' : 'text-slate-500'}`} />
+        )}
+        <span className="max-w-[150px] truncate">{cleanQuery ? renderHighlightedText(clean, cleanQuery) : clean}</span>
       </button>
     );
   };
 
   return (
-    <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 items-start">
+    <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 items-start">
       
-      {/* Right Feed Column (Search Results) */}
-      <div className="flex flex-col gap-5 min-w-0 lg:col-start-2 lg:row-start-1">
+      {/* Right Feed Column (Main Content Stream) */}
+      <div className="flex flex-col gap-4 min-w-0 lg:col-start-2 lg:row-start-1">
         
-        {/* Toolbar Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3.5">
-          <div className="flex items-center gap-3">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 font-sans tracking-tight">
-                Idea Results
-              </h2>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
-                총 {filteredIdeas.length}개 검색됨 (전체 {ideas.length}개)
-              </p>
-            </div>
-
-            {onOpenRegisterModal && (
-              <button
-                onClick={onOpenRegisterModal}
-                title="등록"
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-2xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shrink-0"
-              >
-                <Plus className="w-4 h-4" />
-                <span>등록</span>
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Photography Special Filter Button */}
-            <button
-              type="button"
-              onClick={() => {
-                setIsPhotoFilterActive(!isPhotoFilterActive);
-                setCurrentPage(1);
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
-                isPhotoFilterActive
-                  ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-200'
-                  : 'bg-white hover:bg-amber-50/80 text-slate-700 border border-slate-200 hover:border-amber-300'
-              }`}
-              title="사진, 카메라, 렌즈, 촬영팁 관련 지식만 모아보기"
-            >
-              <Camera className={`w-3.5 h-3.5 ${isPhotoFilterActive ? 'text-white' : 'text-amber-600'}`} />
-              <span>📷 사진·촬영 모아보기</span>
-              {isPhotoFilterActive && (
-                <span className="w-1.5 h-1.5 rounded-full bg-white ml-0.5 animate-pulse" />
-              )}
-            </button>
-
-            {checkedIds.length > 0 && (
-              <div className="flex items-center gap-2">
-                {onOpenMergeModal && (
-                  <button
-                    onClick={() => {
-                      const selected = ideas.filter((i) => checkedIds.includes(i.id));
-                      onOpenMergeModal(selected);
-                    }}
-                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl shadow-2xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
-                  >
-                    <Layers className="w-3.5 h-3.5" />
-                    <span>선택 노트 하나로 통합 ({checkedIds.length})</span>
-                  </button>
-                )}
-
-                <button
-                  onClick={() => setDeleteTarget({ type: 'batch', ids: checkedIds })}
-                  className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>선택 삭제 ({checkedIds.length})</span>
-                </button>
-              </div>
-            )}
-
-            {(searchQuery || selectedTags.length > 0 || selectedSubTags.length > 0 || selectedSource || activeSourceCategory !== 'all') && (
-              <button
-                onClick={resetAllFilters}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
-              >
-                필터 해제
-              </button>
-            )}
-
-            {/* Export CSV/JSON button */}
-            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-1 rounded-xl text-xs font-bold text-slate-700">
-              <Download className="w-3.5 h-3.5 text-slate-500" />
-              <button onClick={() => onExportData('json')} className="hover:text-blue-600 cursor-pointer">JSON</button>
-              <span className="text-slate-300">•</span>
-              <button onClick={() => onExportData('csv')} className="hover:text-blue-600 cursor-pointer">CSV</button>
-            </div>
-
-            {/* Sort Dropdown */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-700">
-              <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
-              <select
-                value={sortField}
-                onChange={(e) => setSortField(e.target.value as any)}
-                className="bg-transparent text-slate-800 font-extrabold outline-none cursor-pointer"
-              >
-                <option value="date">날짜순</option>
-                <option value="views">조회수순</option>
-                <option value="importance">중요도순</option>
-                <option value="title">제목순</option>
-              </select>
-              <button
-                onClick={() => setSortDir(sortDir === 'desc' ? 'asc' : 'desc')}
-                className="text-blue-600 font-extrabold ml-1 hover:text-blue-800 cursor-pointer"
-                title="정렬 방향 전환"
-              >
-                {sortDir === 'desc' ? '↓' : '↑'}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Source Category Extraction Bar (전체, 웹링크, 도서, 문서, 메모) */}
-        <div className="bg-slate-50/90 border border-slate-200/90 p-2 sm:p-2.5 rounded-2xl flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-xs font-black text-slate-700 mr-1 flex items-center gap-1 shrink-0">
-              <Filter className="w-3.5 h-3.5 text-blue-600" />
-              <span>출처 추출:</span>
-            </span>
-
+        {/* Unified Minimal Control & Filter Header */}
+        <div className="bg-white border border-slate-200/80 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
+          {/* Left: Segmented Category Tabs */}
+          <div className="flex items-center gap-1 p-1 bg-slate-100/90 rounded-lg flex-wrap">
             <button
               type="button"
               onClick={() => {
                 setSelectedSourceCategory('all');
+                setIsPhotoFilterActive(false);
                 if (queryCategory !== 'all') onSearchChange(cleanQuery);
                 setCurrentPage(1);
               }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 border ${
-                activeSourceCategory === 'all'
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
-                  : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+              className={`px-2.5 py-1 rounded-md text-xs transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                activeSourceCategory === 'all' && !isPhotoFilterActive
+                  ? 'bg-white text-slate-900 font-semibold shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 font-medium'
               }`}
             >
               <span>전체</span>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
-                activeSourceCategory === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 font-bold'
-              }`}>
-                {sourceCategoryCounts.all}
-              </span>
+              <span className="text-[11px] text-slate-400 tabular-nums">{sourceCategoryCounts.all}</span>
             </button>
 
             {SOURCE_CATEGORIES.map((cat) => {
-              const isSelected = activeSourceCategory === cat.key;
+              const isSelected = activeSourceCategory === cat.key && !isPhotoFilterActive;
               return (
                 <button
                   key={cat.key}
                   type="button"
                   onClick={() => {
+                    setIsPhotoFilterActive(false);
                     if (isSelected) {
                       setSelectedSourceCategory('all');
                       if (queryCategory !== 'all') onSearchChange(cleanQuery);
@@ -688,202 +534,303 @@ export const FeedView: React.FC<FeedViewProps> = ({
                     }
                     setCurrentPage(1);
                   }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 border ${
-                    isSelected ? cat.activeClass : cat.inactiveClass
+                  className={`px-2.5 py-1 rounded-md text-xs transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                    isSelected
+                      ? 'bg-white text-slate-900 font-semibold shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900 font-medium'
                   }`}
-                  title={`출처가 '${cat.label}'인 지식만 추출 (${cat.tag})`}
                 >
-                  <span>{cat.emoji}</span>
                   <span>{cat.label}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
-                    isSelected ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-600'
-                  }`}>
-                    {sourceCategoryCounts[cat.key]}
-                  </span>
+                  <span className="text-[11px] text-slate-400 tabular-nums">{sourceCategoryCounts[cat.key]}</span>
                 </button>
               );
             })}
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsPhotoFilterActive(!isPhotoFilterActive);
+                setCurrentPage(1);
+              }}
+              className={`px-2.5 py-1 rounded-md text-xs transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap ${
+                isPhotoFilterActive
+                  ? 'bg-white text-slate-900 font-semibold shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 font-medium'
+              }`}
+              title="사진, 카메라, 렌즈, 촬영팁 관련 지식만 모아보기"
+            >
+              <Camera className="w-3.5 h-3.5 text-slate-500" />
+              <span>사진</span>
+            </button>
           </div>
 
-          <div className="text-[11px] text-slate-400 font-medium hidden md:flex items-center gap-1">
-            <span>검색창에</span>
-            <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-600 font-mono text-[10px]">[도서]</code>
-            <span>입력 시 바로 추출</span>
+          {/* Right: Sort, Export, Reset & Primary Action */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {(searchQuery || selectedTags.length > 0 || selectedSubTags.length > 0 || selectedSource || activeSourceCategory !== 'all' || isPhotoFilterActive) && (
+              <button
+                type="button"
+                onClick={resetAllFilters}
+                className="px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+              >
+                필터 초기화
+              </button>
+            )}
+
+            {/* Sort Selector */}
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-lg text-xs text-slate-700">
+              <ArrowUpDown className="w-3 h-3 text-slate-400" />
+              <select
+                value={sortField}
+                onChange={(e) => setSortField(e.target.value as any)}
+                className="bg-transparent text-slate-800 font-medium outline-none cursor-pointer"
+              >
+                <option value="date">날짜순</option>
+                <option value="views">조회수순</option>
+                <option value="importance">중요도순</option>
+                <option value="title">제목순</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => setSortDir(sortDir === 'desc' ? 'asc' : 'desc')}
+                className="text-slate-500 hover:text-slate-900 font-semibold ml-0.5 cursor-pointer"
+                title="정렬 방향 전환"
+              >
+                {sortDir === 'desc' ? '↓' : '↑'}
+              </button>
+            </div>
+
+            {/* Export CSV/JSON */}
+            <div className="hidden sm:flex items-center gap-1 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600">
+              <Download className="w-3 h-3 text-slate-400 mr-0.5" />
+              <button type="button" onClick={() => onExportData('json')} className="hover:text-slate-900 cursor-pointer">JSON</button>
+              <span className="text-slate-300" aria-hidden="true">/</span>
+              <button type="button" onClick={() => onExportData('csv')} className="hover:text-slate-900 cursor-pointer">CSV</button>
+            </div>
+
+            {onOpenRegisterModal && (
+              <button
+                type="button"
+                onClick={onOpenRegisterModal}
+                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-lg transition-colors cursor-pointer flex items-center gap-1 shrink-0 whitespace-nowrap"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>새 노트</span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Page Select All Toggle Bar */}
-        {paginatedIdeas.length > 0 && (
-          <div className="flex items-center justify-between text-xs text-slate-500 px-1 font-semibold">
-            <button
-              onClick={toggleSelectAllPage}
-              className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer"
-            >
-              {paginatedIdeas.every((i) => checkedIds.includes(i.id)) ? (
-                <CheckSquare className="w-4 h-4 text-blue-600" />
-              ) : (
-                <Square className="w-4 h-4 text-slate-400" />
-              )}
-              <span>현재 페이지 전체 선택</span>
-            </button>
-            <span>{validCurrentPage} / {totalPages} 페이지</span>
-          </div>
-        )}
+        {/* Sub-bar: Selection Status, Count & Batch Actions */}
+        <div className="flex items-center justify-between gap-2 px-1 text-xs text-slate-500">
+          <div className="flex items-center gap-3 flex-wrap">
+            {paginatedIdeas.length > 0 && (
+              <button
+                type="button"
+                onClick={toggleSelectAllPage}
+                className="flex items-center gap-1.5 hover:text-slate-900 cursor-pointer font-medium"
+              >
+                {paginatedIdeas.every((i) => checkedIds.includes(i.id)) ? (
+                  <CheckSquare className="w-3.5 h-3.5 text-slate-900" />
+                ) : (
+                  <Square className="w-3.5 h-3.5 text-slate-400" />
+                )}
+                <span>페이지 선택</span>
+              </button>
+            )}
 
-        {/* Book Shelf Active Banner */}
+            <span className="tabular-nums">
+              검색 결과 <strong className="text-slate-800 font-semibold">{filteredIdeas.length}</strong>편
+            </span>
+
+            {checkedIds.length > 0 && (
+              <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
+                {onOpenMergeModal && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const selected = ideas.filter((i) => checkedIds.includes(i.id));
+                      onOpenMergeModal(selected);
+                    }}
+                    className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-md transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap"
+                  >
+                    <Layers className="w-3 h-3" />
+                    <span>노트 통합 ({checkedIds.length})</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget({ type: 'batch', ids: checkedIds })}
+                  className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold rounded-md transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>삭제 ({checkedIds.length})</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {paginatedIdeas.length > 0 && (
+            <span className="tabular-nums text-slate-400">
+              {validCurrentPage} / {totalPages} 페이지
+            </span>
+          )}
+        </div>
+
+        {/* Active Source / Book Shelf Contextual Banner */}
         {selectedSource && (
-          <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center font-bold text-base shadow-2xs shrink-0">
-                📚
+          <div className="bg-white border border-slate-200/90 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 text-xs text-slate-500 tabular-nums">
+                <span>선택된 출처</span>
+                <span aria-hidden="true">·</span>
+                <span className="font-semibold text-slate-700">총 {filteredIdeas.length}편의 노트</span>
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-black text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded-full">
-                    도서·출처 서재 모아보기
-                  </span>
-                  <span className="text-xs text-amber-800 font-bold">
-                    총 {filteredIdeas.length}편의 메모
-                  </span>
-                </div>
-                <h3 className="text-base sm:text-lg font-black text-amber-950 mt-0.5">
-                  {selectedSource}
-                </h3>
-              </div>
+              <h3 className="text-base font-bold text-slate-900 mt-0.5">
+                {selectedSource}
+              </h3>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
               {onOpenContinuousReading && filteredIdeas.length > 0 && (
                 <button
+                  type="button"
                   onClick={() => onOpenContinuousReading(selectedSource, filteredIdeas[0]?.id)}
-                  className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black rounded-xl shadow-2xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                  className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
                 >
                   <Book className="w-3.5 h-3.5" />
-                  <span>📖 전편 연속 읽기 ({filteredIdeas.length}편)</span>
+                  <span>연속 읽기 ({filteredIdeas.length}편)</span>
                 </button>
               )}
 
               {onOpenMergeModal && filteredIdeas.length > 1 && (
                 <button
+                  type="button"
                   onClick={() => onOpenMergeModal(filteredIdeas)}
-                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl shadow-2xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
                 >
                   <Layers className="w-3.5 h-3.5" />
-                  <span>📑 이 출처 메모 하나로 통합</span>
+                  <span>하나로 통합</span>
                 </button>
               )}
 
               <button
+                type="button"
                 onClick={() => setSelectedSource(null)}
-                className="px-3 py-1.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1"
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                title="출처 필터 해제"
               >
-                <X className="w-3.5 h-3.5" />
-                <span>서재 필터 해제</span>
+                <X className="w-4 h-4" />
               </button>
             </div>
           </div>
         )}
 
-        {/* Idea Feed List */}
-        <div className="flex flex-col space-y-4">
+        {/* Minimal Idea Feed List */}
+        <div className="flex flex-col space-y-2.5">
           {paginatedIdeas.length === 0 ? (
-            <div className="text-center py-16 bg-slate-50/80 rounded-2xl border border-dashed border-slate-200 text-slate-400">
-              <Filter className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-              <p className="text-sm font-semibold">검색 조건에 일치하는 지식이 없습니다.</p>
+            <div className="text-center py-16 bg-white rounded-xl border border-slate-200/80 text-slate-400">
+              <p className="text-sm font-medium text-slate-600">조건에 일치하는 지식 노트가 없습니다.</p>
               <button
+                type="button"
                 onClick={resetAllFilters}
-                className="mt-3 text-xs font-extrabold text-blue-600 hover:underline cursor-pointer"
+                className="mt-2.5 text-xs font-semibold text-blue-600 hover:underline cursor-pointer"
               >
-                전체 지식 다시 보기
+                전체 노트 다시 보기
               </button>
             </div>
           ) : (
             paginatedIdeas.map((idea) => {
               const isChecked = checkedIds.includes(idea.id);
+              const youTubeInfo = getIdeaYouTubeInfo(idea);
 
               return (
-                <div
+                <article
                   key={idea.id}
-                  className="group bg-white border border-slate-200/90 hover:border-blue-300 rounded-2xl p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all relative"
+                  className={`group bg-white border rounded-xl p-4 sm:p-5 transition-colors relative ${
+                    isChecked
+                      ? 'border-slate-900 bg-slate-50/40'
+                      : 'border-slate-200/80 hover:border-slate-300'
+                  }`}
                 >
-                  <div className="flex flex-col gap-2">
-                    
-                    {/* Top Row: Checkbox + Title + Stars + Source + Actions */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggleCheck(idea.id)}
-                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600 shrink-0 mt-0.5"
-                        />
+                  <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0 space-y-2 w-full">
+                      {/* Header Row: Checkbox + Title + Importance + Date & Hover Actions */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleCheck(idea.id)}
+                            className="w-3.5 h-3.5 rounded text-slate-900 focus:ring-slate-900 cursor-pointer accent-slate-900 shrink-0"
+                          />
 
-                        <h3
-                          onClick={() => onOpenPreviewModal(idea.id)}
-                          className="text-base sm:text-lg md:text-xl font-bold text-[#1a0dab] hover:underline cursor-pointer tracking-tight line-clamp-2"
-                        >
-                          {renderHighlightedText(idea.title, searchQuery)}
-                        </h3>
+                          <h3
+                            onClick={() => onOpenPreviewModal(idea.id)}
+                            className="text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors cursor-pointer tracking-tight line-clamp-1"
+                          >
+                            {renderHighlightedText(idea.title, searchQuery)}
+                          </h3>
 
-                        {/* Stars */}
-                        <div className="flex items-center gap-0.5 shrink-0">
-                          {Array.from({ length: idea.importance || 1 }).map((_, i) => (
-                            <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                          ))}
+                          {(idea.importance || 1) > 1 && (
+                            <span
+                              className="inline-flex items-center gap-0.5 text-[11px] font-medium text-amber-600 shrink-0 tabular-nums"
+                              title={`중요도 ${idea.importance}`}
+                            >
+                              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                              <span>{idea.importance}</span>
+                            </span>
+                          )}
                         </div>
 
-                        {renderSourceBadge(idea)}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs text-slate-400 tabular-nums">
+                            {formatDate(idea.date, idea.id)}
+                          </span>
+
+                          <div className="sm:opacity-0 sm:group-hover:opacity-100 opacity-100 transition-opacity flex items-center gap-0.5">
+                            <button
+                              type="button"
+                              onClick={() => onStartEditIdea(idea.id)}
+                              className="p-1 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                              title="수정"
+                            >
+                              <PenSquare className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteTarget({ type: 'single', id: idea.id, title: idea.title })}
+                              className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                              title="삭제"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
 
-                      {/* Action buttons */}
-                      <div className="sm:opacity-0 sm:group-hover:opacity-100 opacity-100 transition-opacity flex items-center gap-1 shrink-0">
-                        <button
-                          onClick={() => onStartEditIdea(idea.id)}
-                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                          title="수정"
-                        >
-                          <PenSquare className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setDeleteTarget({ type: 'single', id: idea.id, title: idea.title })}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                          title="삭제"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
+                      {/* Body Content Snippet */}
+                      <p
+                        onClick={() => onOpenPreviewModal(idea.id)}
+                        className="text-sm text-slate-600 leading-relaxed line-clamp-2 cursor-pointer hover:text-slate-900 transition-colors pl-6"
+                      >
+                        {renderHighlightedText(idea.content || '본문 내용이 비어있습니다.', searchQuery)}
+                      </p>
 
-                    {/* Metadata line */}
-                    <div className="text-xs text-slate-400 font-medium flex items-center gap-2">
-                      <span>{formatDate(idea.date, idea.id)}</span>
-                      <span>·</span>
-                      <span className="flex items-center gap-1 text-slate-500">
-                        <Eye className="w-3.5 h-3.5 text-slate-400" />
-                        조회수 {idea.views || 0}회
-                      </span>
-                    </div>
+                      {/* Footer Row: Source + Clean Tag Links + View Count */}
+                      <div className="flex items-center justify-between gap-3 pt-1 pl-6 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+                          {renderSourceBadge(idea)}
 
-                    {/* Content snippet & YouTube Thumbnail preview */}
-                    <div className="flex flex-col sm:flex-row items-start justify-between gap-3.5 my-1">
-                      <div className="flex-1 min-w-0 space-y-2">
-                        {/* Content snippet */}
-                        <p
-                          onClick={() => onOpenPreviewModal(idea.id)}
-                          className="text-xs sm:text-sm text-slate-600 leading-relaxed line-clamp-3 cursor-pointer hover:text-slate-900 transition-colors font-normal"
-                        >
-                          {renderHighlightedText(idea.content || '본문 내용이 비어있습니다.', searchQuery)}
-                        </p>
-
-                        {/* Tags */}
-                        <div className="flex flex-wrap gap-1.5 pt-0.5">
                           {(idea.tags || []).map((t, idx) => {
-                            const isPhotoTag = typeof t === 'string' && (PHOTO_PRESET_TAGS.includes(t) || ['사진', '카메라', '렌즈', '촬영'].some((k) => t.includes(k)));
+                            const isSelected = selectedTags.includes(t);
+                            const isHovered = hoveredTag === t;
                             return (
                               <button
                                 key={idx}
+                                type="button"
                                 onClick={() => {
-                                  if (selectedTags.includes(t)) {
+                                  if (isSelected) {
                                     onSelectTags(selectedTags.filter((st) => st !== t));
                                   } else {
                                     onSelectTags([t]);
@@ -891,76 +838,64 @@ export const FeedView: React.FC<FeedViewProps> = ({
                                 }}
                                 onMouseEnter={() => setHoveredTag(t)}
                                 onMouseLeave={() => setHoveredTag(null)}
-                                className={`text-xs px-2.5 py-0.5 rounded-full font-medium transition-all cursor-pointer flex items-center gap-1 ${
-                                  hoveredTag === t
-                                    ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-200'
-                                    : selectedTags.includes(t)
-                                      ? 'bg-blue-600 text-white font-bold'
-                                      : isPhotoTag
-                                        ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-semibold'
-                                        : idx === 0
-                                          ? 'bg-blue-50 text-blue-700 font-semibold border border-blue-100 hover:bg-blue-100'
-                                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                className={`text-xs transition-colors cursor-pointer whitespace-nowrap ${
+                                  isSelected
+                                    ? 'text-blue-600 font-bold underline'
+                                    : isHovered
+                                      ? 'text-slate-900 font-semibold'
+                                      : 'text-slate-500 hover:text-slate-800 font-medium'
                                 }`}
                               >
-                                {isPhotoTag && <span className="text-[10px]">📷</span>}
-                                <span>#{t}</span>
+                                #{t}
                               </button>
                             );
                           })}
                         </div>
-                      </div>
 
-                      {/* YouTube Thumbnail preview (right side) */}
-                      {(() => {
-                        const youTubeInfo = getIdeaYouTubeInfo(idea);
-                        if (!youTubeInfo) return null;
-                        return (
-                          <div
-                            onClick={() =>
-                              setActiveYouTubeVideo({
-                                videoId: youTubeInfo.videoId,
-                                title: idea.title,
-                                videoUrl: youTubeInfo.videoUrl,
-                                idea,
-                              })
-                            }
-                            className="group/yt relative w-full sm:w-36 md:w-44 aspect-video rounded-xl overflow-hidden shadow-2xs border border-slate-200 hover:border-red-400 cursor-pointer shrink-0 transition-all hover:shadow-md bg-slate-900"
-                            title="클릭하여 유튜브 영상 바로 시청"
-                          >
-                            <img
-                              src={youTubeInfo.thumbnailUrl}
-                              alt={idea.title}
-                              className="w-full h-full object-cover group-hover/yt:scale-105 transition-transform duration-300"
-                              loading="lazy"
-                            />
-                            {/* Dark overlay & Play button */}
-                            <div className="absolute inset-0 bg-black/25 group-hover/yt:bg-black/10 flex items-center justify-center transition-colors">
-                              <div className="w-9 h-6.5 rounded-lg bg-red-600/90 group-hover/yt:bg-red-600 group-hover/yt:scale-110 flex items-center justify-center text-white shadow-md transition-all">
-                                <Play className="w-3.5 h-3.5 fill-white ml-0.5" />
-                              </div>
-                            </div>
-                            {/* YouTube logo badge */}
-                            <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/80 text-[10px] text-white font-mono font-bold flex items-center gap-1 shadow-xs">
-                              <Youtube className="w-3 h-3 text-red-500 fill-red-500" />
-                              <span>YouTube</span>
-                            </div>
-                          </div>
-                        );
-                      })()}
+                        <span className="text-xs text-slate-400 tabular-nums shrink-0">
+                          열람 {idea.views || 0}
+                        </span>
+                      </div>
                     </div>
 
+                    {/* Optional YouTube Thumbnail on Right */}
+                    {youTubeInfo && (
+                      <div
+                        onClick={() =>
+                          setActiveYouTubeVideo({
+                            videoId: youTubeInfo.videoId,
+                            title: idea.title,
+                            videoUrl: youTubeInfo.videoUrl,
+                            idea,
+                          })
+                        }
+                        className="group/yt relative w-full sm:w-36 aspect-video rounded-lg overflow-hidden border border-slate-200 cursor-pointer shrink-0 bg-slate-900"
+                        title="클릭하여 유튜브 영상 바로 시청"
+                      >
+                        <img
+                          src={youTubeInfo.thumbnailUrl}
+                          alt={idea.title}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover group-hover/yt:scale-105 transition-transform duration-200"
+                          loading="lazy"
+                        />
+                        <div className="absolute inset-0 bg-black/25 group-hover/yt:bg-black/10 flex items-center justify-center transition-colors">
+                          <div className="w-8 h-6 rounded-md bg-red-600/95 flex items-center justify-center text-white shadow-sm">
+                            <Play className="w-3 h-3 fill-white ml-0.5" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
+                </article>
               );
             })
           )}
         </div>
 
-        {/* Pagination: << < 1 2 3 4 5 6 7 8 9 10 > >> */}
+        {/* Clean Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-1 sm:gap-1.5 pt-6 pb-8 select-none flex-wrap">
-            {/* 맨첫페이지로 << */}
+          <div className="flex items-center justify-center gap-1 pt-4 pb-8 select-none flex-wrap tabular-nums">
             <button
               type="button"
               onClick={() => {
@@ -968,15 +903,13 @@ export const FeedView: React.FC<FeedViewProps> = ({
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               disabled={validCurrentPage === 1}
-              className="px-2 sm:px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600 hover:border-blue-300 disabled:opacity-35 disabled:hover:bg-white disabled:hover:text-slate-400 disabled:hover:border-slate-200 disabled:cursor-not-allowed transition-all font-bold text-xs flex items-center gap-0.5 shadow-2xs cursor-pointer"
-              title="맨첫페이지로 (1페이지)"
-              aria-label="맨첫페이지로"
+              className="p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-35 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              title="처음 페이지"
+              aria-label="처음 페이지"
             >
-              <ChevronsLeft className="w-4 h-4" />
-              <span className="hidden md:inline text-[11px]">처음</span>
+              <ChevronsLeft className="w-3.5 h-3.5" />
             </button>
 
-            {/* 이전 페이지로 < */}
             <button
               type="button"
               onClick={() => {
@@ -984,16 +917,14 @@ export const FeedView: React.FC<FeedViewProps> = ({
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               disabled={validCurrentPage === 1}
-              className="px-2 sm:px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600 hover:border-blue-300 disabled:opacity-35 disabled:hover:bg-white disabled:hover:text-slate-400 disabled:hover:border-slate-200 disabled:cursor-not-allowed transition-all font-bold text-xs flex items-center gap-0.5 shadow-2xs cursor-pointer"
+              className="p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-35 disabled:cursor-not-allowed transition-colors cursor-pointer"
               title="이전 페이지"
               aria-label="이전 페이지"
             >
-              <ChevronLeft className="w-4 h-4" />
-              <span className="hidden md:inline text-[11px]">이전</span>
+              <ChevronLeft className="w-3.5 h-3.5" />
             </button>
 
-            {/* 10개 단위 페이지 번호 목록 */}
-            <div className="flex items-center gap-1 mx-0.5 sm:mx-1">
+            <div className="flex items-center gap-1 mx-1">
               {pageNumbers.map((pageNum) => {
                 const isActive = pageNum === validCurrentPage;
                 return (
@@ -1004,10 +935,10 @@ export const FeedView: React.FC<FeedViewProps> = ({
                       setCurrentPage(pageNum);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className={`min-w-8 sm:min-w-9 h-8 sm:h-9 px-2 text-xs sm:text-sm font-extrabold rounded-xl transition-all cursor-pointer flex items-center justify-center ${
+                    className={`min-w-8 h-8 px-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer flex items-center justify-center ${
                       isActive
-                        ? 'bg-blue-600 text-white shadow-2xs scale-105 ring-2 ring-blue-200'
-                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-blue-300 hover:text-blue-600'
+                        ? 'bg-slate-900 text-white'
+                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                     }`}
                     aria-current={isActive ? 'page' : undefined}
                   >
@@ -1017,7 +948,6 @@ export const FeedView: React.FC<FeedViewProps> = ({
               })}
             </div>
 
-            {/* 다음 페이지로 > */}
             <button
               type="button"
               onClick={() => {
@@ -1025,15 +955,13 @@ export const FeedView: React.FC<FeedViewProps> = ({
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               disabled={validCurrentPage === totalPages}
-              className="px-2 sm:px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600 hover:border-blue-300 disabled:opacity-35 disabled:hover:bg-white disabled:hover:text-slate-400 disabled:hover:border-slate-200 disabled:cursor-not-allowed transition-all font-bold text-xs flex items-center gap-0.5 shadow-2xs cursor-pointer"
+              className="p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-35 disabled:cursor-not-allowed transition-colors cursor-pointer"
               title="다음 페이지"
               aria-label="다음 페이지"
             >
-              <span className="hidden md:inline text-[11px]">다음</span>
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
 
-            {/* 맨마지막 페이지로 >> */}
             <button
               type="button"
               onClick={() => {
@@ -1041,397 +969,336 @@ export const FeedView: React.FC<FeedViewProps> = ({
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               disabled={validCurrentPage === totalPages}
-              className="px-2 sm:px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600 hover:border-blue-300 disabled:opacity-35 disabled:hover:bg-white disabled:hover:text-slate-400 disabled:hover:border-slate-200 disabled:cursor-not-allowed transition-all font-bold text-xs flex items-center gap-0.5 shadow-2xs cursor-pointer"
-              title={`맨마지막 페이지로 (${totalPages}페이지)`}
-              aria-label="맨마지막 페이지로"
+              className="p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-35 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              title="끝 페이지"
+              aria-label="끝 페이지"
             >
-              <span className="hidden md:inline text-[11px]">끝</span>
-              <ChevronsRight className="w-4 h-4" />
+              <ChevronsRight className="w-3.5 h-3.5" />
             </button>
           </div>
         )}
 
       </div>
 
-      {/* Left Sidebar Column (오늘 되짚어볼 지식 & 도서 서재) */}
-      <aside className="space-y-6 sticky top-20 min-w-0 lg:col-start-1 lg:row-start-1">
-        <div className="bg-slate-100/80 border border-slate-200/80 rounded-2xl p-5 space-y-6 shadow-2xs">
-          
-          {/* Today Flashback Recommendation */}
-          <div>
-            {todayRecIdea && (
-              <div className="bg-white border border-amber-200/90 rounded-xl p-4 shadow-2xs space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-amber-800 text-xs font-bold">
-                    <Sparkles className="w-4 h-4 text-amber-500" />
-                    <span className="text-sm font-bold text-slate-900 font-sans">오늘 되짚어볼 지식</span>
-                  </div>
-                  <button
-                    onClick={onRefreshTodayRec}
-                    className="p-1 text-slate-400 hover:text-amber-600 rounded transition-colors cursor-pointer"
-                    title="다른 지식 추천 받기"
-                  >
-                    <RotateCw className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                <h4
-                  onClick={() => onOpenPreviewModal(todayRecIdea.id)}
-                  className="font-bold text-sm text-slate-900 hover:text-blue-600 cursor-pointer line-clamp-2"
-                >
-                  {todayRecIdea.title}
-                </h4>
-
-                <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">
-                  {todayRecIdea.content}
-                </p>
-
-                <button
-                  onClick={() => onOpenPreviewModal(todayRecIdea.id)}
-                  className="text-xs font-bold text-amber-800 hover:underline pt-1 flex items-center gap-1 cursor-pointer"
-                >
-                  <span>자세히 보기</span>
-                  <ArrowRight className="w-3 h-3" />
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="h-px bg-slate-200"></div>
-
-          {/* Book Shelf (도서 및 출처별 서재) - 토글 형태 (도서, 문서, 메모, 웹링크) */}
-          <div className="space-y-3">
+      {/* Left Sidebar Column (Single-Elevation Minimal Navigation) */}
+      <aside className="space-y-4 sticky top-20 min-w-0 lg:col-start-1 lg:row-start-1">
+        
+        {/* 1. Today Flashback Recommendation */}
+        {todayRecIdea && (
+          <div className="bg-white border border-slate-200/80 rounded-xl p-4 space-y-2">
             <div className="flex items-center justify-between">
-              <h3 className="font-extrabold text-slate-900 text-sm font-sans flex items-center gap-1.5">
-                <Book className="w-4 h-4 text-amber-600" />
-                <span>도서 및 출처 서재 ({sourceStats.length}개)</span>
-              </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={toggleAllSourceCategories}
-                  className="text-[11px] text-slate-500 hover:text-slate-800 font-bold transition-colors cursor-pointer"
-                >
-                  {allCategoriesExpanded ? '전체 접기' : '전체 펼치기'}
-                </button>
-                {selectedSource && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedSource(null)}
-                    className="text-[11px] text-blue-600 font-bold hover:underline cursor-pointer"
-                  >
-                    필터 해제
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-              {sourceStats.length === 0 ? (
-                <p className="text-xs text-slate-400 py-1">등록된 출처가 없습니다.</p>
-              ) : (
-                ([
-                  { category: 'book' as const, label: '도서', icon: '📚' },
-                  { category: 'document' as const, label: '문서', icon: '📄' },
-                  { category: 'memo' as const, label: '메모', icon: '💡' },
-                  { category: 'link' as const, label: '웹링크', icon: '🔗' },
-                ]).map((sec) => {
-                  const sectionItems = sourceStats.filter((s) => s.category === sec.category);
-                  const isExpanded = !!expandedSourceCategories[sec.category];
-                  const totalCount = sourceCategoryCounts[sec.category] || 0;
-
-                  return (
-                    <div
-                      key={sec.category}
-                      className="rounded-xl border border-slate-200/90 bg-white overflow-hidden shadow-2xs transition-all"
-                    >
-                      {/* Category Toggle Header Button */}
-                      <button
-                        type="button"
-                        onClick={() => toggleSourceCategory(sec.category)}
-                        className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/90 text-slate-800 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer"
-                        aria-expanded={isExpanded}
-                      >
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <ChevronDown
-                            className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform duration-200 ${
-                              isExpanded ? 'rotate-0' : '-rotate-90'
-                            }`}
-                          />
-                          <span className="text-sm shrink-0">{sec.icon}</span>
-                          <span className="font-extrabold text-slate-900 truncate">{sec.label}</span>
-                          <span className="text-[10px] text-slate-400 font-mono font-medium shrink-0">
-                            ({sectionItems.length}종 / {totalCount}개)
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-slate-400 font-medium shrink-0">
-                          {isExpanded ? '접기' : '펼치기'}
-                        </span>
-                      </button>
-
-                      {/* Sub-items list */}
-                      {isExpanded && (
-                        <div className="p-1.5 space-y-1 bg-slate-50/40 border-t border-slate-100">
-                          {sectionItems.length === 0 ? (
-                            <p className="text-[11px] text-slate-400 py-1.5 px-2">
-                              등록된 {sec.label} 항목이 없습니다.
-                            </p>
-                          ) : (
-                            sectionItems.map((src) => {
-                              const isSelected =
-                                selectedSource?.toLowerCase() === src.displayName.toLowerCase();
-
-                              return (
-                                <button
-                                  key={src.displayName}
-                                  type="button"
-                                  onClick={() =>
-                                    setSelectedSource(isSelected ? null : src.displayName)
-                                  }
-                                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs text-left transition-all cursor-pointer flex items-center justify-between gap-2 border ${
-                                    isSelected
-                                      ? 'bg-amber-100 text-amber-950 font-black border-amber-300 shadow-2xs ring-1 ring-amber-300'
-                                      : 'bg-white hover:bg-slate-50 text-slate-700 font-semibold border-slate-200/80 hover:border-slate-300'
-                                  }`}
-                                  title={src.displayName}
-                                >
-                                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                    {src.isYouTube ? (
-                                      <Youtube className="w-3.5 h-3.5 text-red-600 inline shrink-0" />
-                                    ) : (
-                                      <span className="w-1 h-1 rounded-full bg-slate-400 shrink-0" />
-                                    )}
-                                    <span className="truncate">{src.displayName}</span>
-                                  </div>
-                                  <span
-                                    className={`text-[10px] px-1.5 py-0.2 rounded-full shrink-0 font-bold ${
-                                      isSelected
-                                        ? 'bg-amber-200 text-amber-900'
-                                        : 'bg-slate-100 text-slate-500'
-                                    }`}
-                                  >
-                                    {src.count}
-                                  </span>
-                                </button>
-                              );
-                            })
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          <div className="h-px bg-slate-200"></div>
-
-          {/* Integrated Tag Filter & Dropdown */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-extrabold text-slate-900 text-sm font-sans flex items-center gap-1.5">
-                <Filter className="w-4 h-4 text-blue-600" />
-                <span>연관 주제 및 태그</span>
-              </h3>
-            </div>
-
-            {/* Tag Selector Trigger Button */}
-            <div className="relative">
+              <span className="text-xs font-bold text-slate-900 tracking-tight">
+                오늘 되짚어볼 지식
+              </span>
               <button
                 type="button"
-                onClick={() => setIsTagDropdownOpen(!isTagDropdownOpen)}
-                className="w-full pl-3.5 pr-8 py-2 bg-white border border-slate-300 hover:border-blue-400 rounded-xl text-xs font-bold text-slate-800 shadow-2xs outline-none cursor-pointer transition-all flex items-center justify-between text-left"
+                onClick={onRefreshTodayRec}
+                className="p-1 text-slate-400 hover:text-slate-700 rounded transition-colors cursor-pointer"
+                title="다른 지식 추천 받기"
               >
-                <span className="truncate">
-                  {selectedTags.length > 0
-                    ? `#${selectedTags.join(', ')} (${filteredIdeas.length}개)`
-                    : `🏷️ 전체 주제 / 태그 선택 (${mainTagList.length}개)`}
-                </span>
-                <ChevronDown className={`w-4 h-4 text-slate-400 absolute right-3 transition-transform ${isTagDropdownOpen ? 'rotate-180 text-blue-600' : ''}`} />
+                <RotateCw className="w-3.5 h-3.5" />
               </button>
-
-              {/* Tag Dropdown Panel */}
-              {isTagDropdownOpen && (
-                <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 space-y-2.5">
-                  <div className="space-y-2 pb-2.5 border-b border-slate-100">
-                    <input
-                      type="text"
-                      value={tagSearchQuery}
-                      onChange={(e) => setTagSearchQuery(e.target.value)}
-                      placeholder="태그 검색..."
-                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:bg-white focus:border-blue-500"
-                    />
-
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-slate-500 font-semibold">정렬</span>
-                      <div className="flex items-center p-0.5 bg-slate-100 border border-slate-200 rounded-lg">
-                        <button
-                          onClick={() => setTagSortOrder('count')}
-                          className={`px-2 py-0.5 rounded-md font-bold transition-all ${
-                            tagSortOrder === 'count' ? 'bg-white text-blue-700 shadow-2xs' : 'text-slate-500'
-                          }`}
-                        >
-                          개수순
-                        </button>
-                        <button
-                          onClick={() => setTagSortOrder('alphabetical')}
-                          className={`px-2 py-0.5 rounded-md font-bold transition-all ${
-                            tagSortOrder === 'alphabetical' ? 'bg-white text-blue-700 shadow-2xs' : 'text-slate-500'
-                          }`}
-                        >
-                          가나다순
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="max-h-52 overflow-y-auto space-y-1">
-                    <button
-                      onClick={() => {
-                        onSelectTags([]);
-                        onSelectSubTags([]);
-                        setIsTagDropdownOpen(false);
-                      }}
-                      className={`w-full px-2.5 py-1.5 rounded-xl text-xs font-bold text-left cursor-pointer transition-all ${
-                        selectedTags.length === 0 ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      🏷️ 전체 주제 보기 (총 {ideas.length}개)
-                    </button>
-
-                    {matchingMainTags.map((t) => {
-                      const isSelected = selectedTags.includes(t.name);
-                      return (
-                        <button
-                          key={t.name}
-                          onClick={() => {
-                            if (isSelected) {
-                              onSelectTags(selectedTags.filter((st) => st !== t.name));
-                            } else {
-                              onSelectTags([t.name]);
-                            }
-                            onSelectSubTags([]);
-                            setIsTagDropdownOpen(false);
-                          }}
-                          className={`w-full px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
-                            isSelected ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-100 text-slate-800'
-                          }`}
-                        >
-                          <span className="truncate">#{t.name}</span>
-                          <span className={`text-[10px] font-mono shrink-0 ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
-                            ({t.count}개)
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Active Tag Pill */}
-            {selectedTags.length > 0 && (
-              <div className="flex items-center justify-between bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl text-xs">
-                <span className="font-extrabold text-blue-900">
-                  선택 주제: #{selectedTags.join(', ')}
-                </span>
+            <h4
+              onClick={() => onOpenPreviewModal(todayRecIdea.id)}
+              className="font-bold text-sm text-slate-900 hover:text-blue-600 cursor-pointer line-clamp-2 transition-colors"
+            >
+              {todayRecIdea.title}
+            </h4>
+
+            <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">
+              {todayRecIdea.content}
+            </p>
+          </div>
+        )}
+
+        {/* 2. Book & Source Shelf (Collapsible Accordion, Single-Elevation) */}
+        <div className="bg-white border border-slate-200/80 rounded-xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-slate-900 text-xs tracking-tight">
+              도서 및 출처 서재 <span className="text-slate-400 font-normal tabular-nums">({sourceStats.length})</span>
+            </h3>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleAllSourceCategories}
+                className="text-[11px] text-slate-400 hover:text-slate-800 font-medium transition-colors cursor-pointer"
+              >
+                {allCategoriesExpanded ? '모두 접기' : '모두 펼치기'}
+              </button>
+              {selectedSource && (
                 <button
-                  onClick={() => {
-                    onSelectTags([]);
-                    onSelectSubTags([]);
-                  }}
-                  className="text-[11px] text-blue-700 hover:text-blue-900 font-extrabold underline cursor-pointer"
+                  type="button"
+                  onClick={() => setSelectedSource(null)}
+                  className="text-[11px] text-blue-600 font-semibold hover:underline cursor-pointer"
                 >
                   해제
                 </button>
-              </div>
-            )}
+              )}
+            </div>
+          </div>
 
-            {/* Sub Tags List */}
-            {selectedTags.length > 0 && subTagList.length > 0 && (
-              <div className="pt-2 border-t border-slate-200/80 space-y-1.5">
-                <span className="text-[11px] font-bold text-emerald-800">└ 하위 연관 태그</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {subTagList.map((sub) => {
-                    const isSubSelected = selectedSubTags.includes(sub.name);
-                    return (
+          <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto -mx-1 px-1">
+            {sourceStats.length === 0 ? (
+              <p className="text-xs text-slate-400 py-2">등록된 출처가 없습니다.</p>
+            ) : (
+              ([
+                { category: 'book' as const, label: '도서' },
+                { category: 'document' as const, label: '문서' },
+                { category: 'memo' as const, label: '메모' },
+                { category: 'link' as const, label: '웹링크' },
+              ]).map((sec) => {
+                const sectionItems = sourceStats.filter((s) => s.category === sec.category);
+                const isExpanded = !!expandedSourceCategories[sec.category];
+
+                return (
+                  <div key={sec.category} className="py-1.5 first:pt-0 last:pb-0">
+                    <button
+                      type="button"
+                      onClick={() => toggleSourceCategory(sec.category)}
+                      className="w-full py-1.5 px-1 text-slate-800 hover:text-slate-950 text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer"
+                      aria-expanded={isExpanded}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <ChevronDown
+                          className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-150 ${
+                            isExpanded ? 'rotate-0' : '-rotate-90'
+                          }`}
+                        />
+                        <span>{sec.label}</span>
+                      </div>
+                      <span className="text-[11px] text-slate-400 tabular-nums font-normal">
+                        {sectionItems.length}
+                      </span>
+                    </button>
+
+                    {isExpanded && (
+                      <div className="mt-1 space-y-0.5 pl-3">
+                        {sectionItems.length === 0 ? (
+                          <p className="text-[11px] text-slate-400 py-1 px-2">
+                            등록된 {sec.label} 항목 없음
+                          </p>
+                        ) : (
+                          sectionItems.map((src) => {
+                            const isSelected =
+                              selectedSource?.toLowerCase() === src.displayName.toLowerCase();
+
+                            return (
+                              <button
+                                key={src.displayName}
+                                type="button"
+                                onClick={() =>
+                                  setSelectedSource(isSelected ? null : src.displayName)
+                                }
+                                className={`w-full px-2.5 py-1.5 rounded-lg text-xs text-left transition-colors cursor-pointer flex items-center justify-between gap-2 ${
+                                  isSelected
+                                    ? 'bg-slate-900 text-white font-semibold'
+                                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium'
+                                }`}
+                                title={src.displayName}
+                              >
+                                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                  {src.isYouTube && (
+                                    <Youtube className={`w-3 h-3 shrink-0 ${isSelected ? 'text-red-300' : 'text-red-600'}`} />
+                                  )}
+                                  <span className="truncate">{src.displayName}</span>
+                                </div>
+                                <span
+                                  className={`text-[11px] shrink-0 tabular-nums ${
+                                    isSelected ? 'text-slate-300' : 'text-slate-400'
+                                  }`}
+                                >
+                                  {src.count}
+                                </span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* 3. Integrated Tag Filter & Network */}
+        <div className="bg-white border border-slate-200/80 rounded-xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-slate-900 text-xs tracking-tight">
+              주제 및 태그 <span className="text-slate-400 font-normal tabular-nums">({mainTagList.length})</span>
+            </h3>
+            {selectedTags.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectTags([]);
+                  onSelectSubTags([]);
+                }}
+                className="text-[11px] text-blue-600 font-semibold hover:underline cursor-pointer"
+              >
+                해제
+              </button>
+            )}
+          </div>
+
+          {/* Tag Selector Dropdown Trigger */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsTagDropdownOpen(!isTagDropdownOpen)}
+              className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-lg text-xs font-medium text-slate-700 outline-none cursor-pointer transition-colors flex items-center justify-between text-left"
+            >
+              <span className="truncate">
+                {selectedTags.length > 0
+                  ? `#${selectedTags.join(', ')} (${filteredIdeas.length})`
+                  : '전체 태그에서 선택...'}
+              </span>
+              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${isTagDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isTagDropdownOpen && (
+              <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-white border border-slate-200 rounded-xl shadow-lg p-2.5 space-y-2">
+                <div className="space-y-1.5 pb-2 border-b border-slate-100">
+                  <input
+                    type="text"
+                    value={tagSearchQuery}
+                    onChange={(e) => setTagSearchQuery(e.target.value)}
+                    placeholder="태그 검색..."
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-slate-900"
+                  />
+
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-400">정렬</span>
+                    <div className="flex items-center p-0.5 bg-slate-100 rounded-md">
                       <button
-                        key={sub.name}
-                        onClick={() => {
-                          if (isSubSelected) {
-                            onSelectSubTags(selectedSubTags.filter((s) => s !== sub.name));
-                          } else {
-                            onSelectSubTags([...selectedSubTags, sub.name]);
-                          }
-                        }}
-                        onMouseEnter={() => setHoveredTag(sub.name)}
-                        onMouseLeave={() => setHoveredTag(null)}
-                        className={`text-[11px] font-medium px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-                          isSubSelected
-                            ? 'bg-emerald-600 text-white font-bold'
-                            : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                        type="button"
+                        onClick={() => setTagSortOrder('count')}
+                        className={`px-2 py-0.5 rounded font-semibold transition-colors ${
+                          tagSortOrder === 'count' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500'
                         }`}
                       >
-                        #{sub.name} ({sub.count})
+                        빈도순
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTagSortOrder('alphabetical')}
+                        className={`px-2 py-0.5 rounded font-semibold transition-colors ${
+                          tagSortOrder === 'alphabetical' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500'
+                        }`}
+                      >
+                        가나다순
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="max-h-52 overflow-y-auto space-y-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSelectTags([]);
+                      onSelectSubTags([]);
+                      setIsTagDropdownOpen(false);
+                    }}
+                    className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold text-left cursor-pointer transition-colors ${
+                      selectedTags.length === 0 ? 'bg-slate-100 text-slate-900' : 'hover:bg-slate-50 text-slate-600'
+                    }`}
+                  >
+                    전체 보기 ({ideas.length})
+                  </button>
+
+                  {matchingMainTags.map((t) => {
+                    const isSelected = selectedTags.includes(t.name);
+                    return (
+                      <button
+                        key={t.name}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            onSelectTags(selectedTags.filter((st) => st !== t.name));
+                          } else {
+                            onSelectTags([t.name]);
+                          }
+                          onSelectSubTags([]);
+                          setIsTagDropdownOpen(false);
+                        }}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between transition-colors cursor-pointer ${
+                          isSelected ? 'bg-slate-900 text-white font-semibold' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <span className="truncate">#{t.name}</span>
+                        <span className={`text-[11px] tabular-nums shrink-0 ${isSelected ? 'text-slate-300' : 'text-slate-400'}`}>
+                          {t.count}
+                        </span>
                       </button>
                     );
                   })}
                 </div>
               </div>
             )}
-
-            {/* Connected Tag Network Box */}
-            <div className="mt-4 p-3.5 bg-gradient-to-br from-indigo-50/90 via-blue-50/70 to-slate-50 border border-indigo-200 rounded-2xl space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-indigo-900 text-xs font-bold">
-                  <Network className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>연결 태그 네트워크</span>
-                </div>
-                {hoveredTag && (
-                  <span className="text-[10px] font-extrabold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">
-                    #{hoveredTag}
-                  </span>
-                )}
-              </div>
-
-              <div className="text-xs text-slate-600 leading-relaxed">
-                {hoveredTag ? (
-                  connectedNetwork.length === 0 ? (
-                    <p className="text-[11px] text-indigo-800 bg-white p-2 rounded-xl border border-indigo-100">
-                      '#{hoveredTag}' 태그는 다른 태그와 함께 등록된 노드가 없습니다.
-                    </p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      <p className="text-[11px] text-indigo-900 font-semibold">'#{hoveredTag}'와 함께 포함된 태그들:</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {connectedNetwork.map((item) => (
-                          <button
-                            key={item.name}
-                            onClick={() => {
-                              onSelectTags([item.name]);
-                              onSelectSubTags([]);
-                            }}
-                            className="text-xs font-bold px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-600 hover:text-white border border-indigo-200 text-indigo-900 transition-all shadow-2xs flex items-center gap-1 cursor-pointer"
-                            title={`함께 포함된 노트: ${item.titles.join(', ')}`}
-                          >
-                            <span>#{item.name}</span>
-                            <span className="text-[10px] text-indigo-600 font-extrabold">({item.count})</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                ) : (
-                  <p className="text-xs text-slate-500 font-medium">
-                    태그에 마우스를 올리면 연관 태그 네트워크가 여기에 표시됩니다.
-                  </p>
-                )}
-              </div>
-            </div>
-
           </div>
 
+          {/* Sub Tags List */}
+          {selectedTags.length > 0 && subTagList.length > 0 && (
+            <div className="pt-2 border-t border-slate-100 space-y-1.5">
+              <span className="text-[11px] font-medium text-slate-400">연관 하위 태그</span>
+              <div className="flex flex-wrap gap-1">
+                {subTagList.map((sub) => {
+                  const isSubSelected = selectedSubTags.includes(sub.name);
+                  return (
+                    <button
+                      key={sub.name}
+                      type="button"
+                      onClick={() => {
+                        if (isSubSelected) {
+                          onSelectSubTags(selectedSubTags.filter((s) => s !== sub.name));
+                        } else {
+                          onSelectSubTags([...selectedSubTags, sub.name]);
+                        }
+                      }}
+                      onMouseEnter={() => setHoveredTag(sub.name)}
+                      onMouseLeave={() => setHoveredTag(null)}
+                      className={`text-xs px-2 py-0.5 rounded-md transition-colors cursor-pointer tabular-nums ${
+                        isSubSelected
+                          ? 'bg-slate-900 text-white font-semibold'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
+                      }`}
+                    >
+                      #{sub.name} <span className="opacity-60">{sub.count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Contextual Connected Tag Network (Shown cleanly on hover) */}
+          {hoveredTag && connectedNetwork.length > 0 && (
+            <div className="pt-2.5 border-t border-slate-100 space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] text-slate-500">
+                <span>'#{hoveredTag}' 연관 태그</span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {connectedNetwork.map((item) => (
+                  <button
+                    key={item.name}
+                    type="button"
+                    onClick={() => {
+                      onSelectTags([item.name]);
+                      onSelectSubTags([]);
+                    }}
+                    className="text-xs px-2 py-0.5 rounded-md bg-slate-50 hover:bg-slate-900 hover:text-white border border-slate-200/80 text-slate-700 transition-colors cursor-pointer tabular-nums"
+                    title={`함께 포함된 노트: ${item.titles.join(', ')}`}
+                  >
+                    #{item.name} <span className="opacity-60">{item.count}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </aside>
 
