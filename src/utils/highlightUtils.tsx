@@ -10,9 +10,19 @@ export function renderHighlightedText(text: string, query?: string): React.React
 
   const terms = query
     .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    .split(/[\s|,]+/)
+    .map((t) => t.trim())
+    .filter((t) => {
+      if (!t) return false;
+      const lower = t.toLowerCase();
+      // Ignore boolean operators and excluded terms
+      if (['and', 'or', 'not', '&&', '||', '+', '-'].includes(lower)) return false;
+      if (lower.startsWith('-') || lower.startsWith('!')) return false;
+      if (/^\[.*\]$/.test(lower)) return false;
+      return true;
+    })
+    .map((t) => t.replace(/^#/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .filter(Boolean);
 
   if (terms.length === 0) return text;
 

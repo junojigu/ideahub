@@ -20,7 +20,8 @@ import {
   PHOTO_PRESET_TAGS,
   extractYouTubeVideoId,
   getIdeaYouTubeInfo,
-  isYouTubeUrl
+  isYouTubeUrl,
+  matchesBooleanSearchQuery
 } from '../utils/sourceUtils';
 import { ConfirmModal } from './ConfirmModal';
 import { YouTubePlayerModal } from './YouTubePlayerModal';
@@ -249,21 +250,9 @@ export const FeedView: React.FC<FeedViewProps> = ({
       if (!selectedSubTags.every((t) => idea.tags?.includes(t))) return false;
     }
 
-    // 4. Search query filter (matches title, content, tags, AND sourceUrl!)
-    if (searchTerms.length > 0) {
-      const title = (idea.title || '').toLowerCase();
-      const content = (idea.content || '').toLowerCase();
-      const tagsStr = (idea.tags || []).join(' ').toLowerCase();
-      const source = (idea.sourceUrl || '').toLowerCase();
-
-      const matchesAll = searchTerms.every(
-        (term) =>
-          title.includes(term) ||
-          content.includes(term) ||
-          tagsStr.includes(term) ||
-          source.includes(term)
-      );
-      if (!matchesAll) return false;
+    // 4. Search query filter (supports AND, OR, NOT -, #tag across title, content, tags, sourceUrl)
+    if (cleanQuery.trim()) {
+      if (!matchesBooleanSearchQuery(cleanQuery, idea)) return false;
     }
 
     return true;

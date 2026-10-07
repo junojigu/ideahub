@@ -340,3 +340,66 @@ export function getIdeaYouTubeInfo(idea: {
   return null;
 }
 
+/**
+ * Evaluates a search query supporting boolean operators:
+ * - OR: `A OR B`, `A | B`, `A, B` (matches if any OR-branch matches)
+ * - AND: `A B`, `A AND B`, `A && B`, `A + B` (all terms in an AND-group must match)
+ * - NOT (Exclude): `-단어` or `NOT 단어` (excludes notes containing the term)
+ * - Tag filter: `#태그` (matches tag name)
+ */
+export function matchesBooleanSearchQuery(
+  cleanQuery: string,
+  idea: { title?: string; content?: string; tags?: string[]; sourceUrl?: string }
+): boolean {
+  const trimmed = cleanQuery.trim();
+  if (!trimmed) return true;
+
+  const title = (idea.title || '').toLowerCase();
+  const content = (idea.content || '').toLowerCase();
+  const tagsList = (idea.tags || []).map((t) => String(t).toLowerCase());
+  const tagsStr = tagsList.join(' ');
+  const source = (idea.sourceUrl || '').toLowerCase();
+  const combined = `${title} ${content} ${tagsStr} ${source}`;
+
+  // Split by OR operators: " OR " (case-insensitive), "|", or ","
+  const orBranches = trimmed
+    .split(/\s+or\s+|\s*\|\|?\s*|\s*,\s*/i)
+    .map((b) => b.trim())
+    .filter(Boolean);
+
+  if (orBranches.length === 0) return true;
+
+  return orBranches.some((branch) => {
+    // Normalize explicit AND / NOT keywords inside this branch
+    const normalizedBranch = branch
+      .replace(/\s+(?:and|&&|\+)\s+/gi, ' ')
+      .replace(/(?:^|\s+)not\s+(\S+)/gi, ' -$1');
+
+    const tokens = normalizedBranch
+      .split(/\s+/)
+      .map((t) => t.trim().toLowerCase())
+      .filter((t) => Boolean(t) && t !== 'and' && t !== '&&' && t !== '+');
+
+    if (tokens.length === 0) return true;
+
+    return tokens.every((token) => {
+      // 1. Exclude operator (-term or !term)
+      if ((token.startsWith('-') || token.startsWith('!')) && token.length > 1) {
+        const excludeTerm = token.slice(1).replace(/^#/, '');
+        if (!excludeTerm) return true;
+        return !combined.includes(excludeTerm);
+      }
+
+      // 2. Tag operator (#tag)
+      if (token.startsWith('#') && token.length > 1) {
+        const tagTerm = token.slice(1);
+        return tagsList.some((t) => t.includes(tagTerm)) || combined.includes(tagTerm);
+      }
+
+      // 3. Standard keyword match across title, content, tags, and sourceUrl
+      return combined.includes(token);
+    });
+  });
+}
+
+
